@@ -219,6 +219,12 @@ enum L {
         "nav.aroundCourtyard": "Weiter um den Hof herum",
         "nav.toSporthalleDirect": "Direkter Sporthallen-Eingang",
         "nav.toMensaEG": "Gehe zum Mensa Eingang",
+        "nav.crossCourtyardB": "Gehe über den Hof zum B-Trakt",
+        "nav.crossCourtyardC": "Gehe über den Hof zum C-Trakt",
+        "nav.crossCourtyardExit": "Gehe über den Hof Richtung Ausgang",
+        "nav.stairsUp": "Nimm die Treppe ins Obergeschoss",
+        "nav.stairsDown": "Nimm die Treppe ins Erdgeschoss",
+        "nav.goTo": "Gehe zu",
     ]
 
     // MARK: - English
@@ -399,5 +405,11 @@ enum L {
         "nav.aroundCourtyard": "Continue around the courtyard",
         "nav.toSporthalleDirect": "Direct gym entrance",
         "nav.toMensaEG": "Go to cafeteria entrance",
+        "nav.crossCourtyardB": "Cross the courtyard to the B wing",
+        "nav.crossCourtyardC": "Cross the courtyard to the C wing",
+        "nav.crossCourtyardExit": "Cross the courtyard towards the exit",
+        "nav.stairsUp": "Take the stairs up to the upper floor",
+        "nav.stairsDown": "Take the stairs down to the ground floor",
+        "nav.goTo": "Go to",
     ]
 }

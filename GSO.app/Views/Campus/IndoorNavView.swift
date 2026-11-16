@@ -36,17 +36,6 @@ struct NavNode: Identifiable, Hashable {
     static func == (lhs: NavNode, rhs: NavNode) -> Bool { lhs.id == rhs.id }
 }
 
-struct NavEdge {
-    let from: String
-    let to: String
-    let weight: Double
-    let instruction: String
-    let reverseInstruction: String
-    let icon: String
-    let reverseIcon: String
-    let waypoints: [GeoCoord]
-}
-
 struct NavStep: Identifiable {
     let id = UUID()
     let instruction: String
@@ -62,9 +51,8 @@ struct NavStep: Identifiable {
 
 enum SchoolGraph {
 
-    // Developer diagnostics. Keep false for production; set true while fixing routes.
-    // It validates only outdoor/helper edges against building outlines and all edges
-    // against forbidden zones, then prints exact problem edges in the Xcode console.
+    // Developer diagnostics. Keep false for production; set true to print the zone sequence
+    // of every computed route in the Xcode console.
     static let routeDebugLoggingEnabled = false
     static let showDebugNodesOnMap = false
 
@@ -240,9 +228,9 @@ enum SchoolGraph {
 
     // MARK: - Physical wall line supplied by the user
     // GeoJSON uses lon/lat. These coordinates are converted to lat/lon here.
-    // This is NOT rendered in production; it is used by the debug validator to
-    // catch route segments that cross real school walls even when the rough
-    // colored building polygons are not precise enough.
+    // This is NOT rendered in production (only with showDebugNodesOnMap). Its outer
+    // corners are the GPS control points used to georeference the CAD floor plan
+    // in Tools/school-grid/build_school_grid.py.
     static let physicalWallLine: [GeoCoord] = [
         GeoCoord(lat: 50.92791861090339,  lon: 6.9960400576444215),
         GeoCoord(lat: 50.92772137609089,  lon: 6.996614404477441),
@@ -259,13 +247,6 @@ enum SchoolGraph {
         GeoCoord(lat: 50.9279193631869,   lon: 6.996037886609514),
     ]
 
-
-    // MARK: - Helper for edge creation
-    private static func re(_ room: String, _ corr: String, _ w: Double, _ iKey: String) -> NavEdge {
-        NavEdge(from: room, to: corr, weight: w,
-                instruction: iKey, reverseInstruction: "nav.goToRoom",
-                icon: "door.left.hand.open", reverseIcon: "door.left.hand.open", waypoints: [])
-    }
 
     // MARK: - Ground Floor Nodes
     static let groundFloorNodes: [NavNode] = [
@@ -368,7 +349,7 @@ enum SchoolGraph {
         NavNode(id: "Umkleide", displayNameKey: "node.changingRoom", block: "Sport", floor: 0,
                 coordinate: GeoCoord(lat: 50.927997, lon: 6.995554), category: .special, isNavigable: true),
         NavNode(id: "Aula", displayNameKey: "node.aula", block: "Aula", floor: 0,
-                coordinate: GeoCoord(lat: 50.927691, lon: 6.996388), category: .special, isNavigable: true),
+                coordinate: GeoCoord(lat: 50.927722, lon: 6.996407), category: .special, isNavigable: true),
         // Hof: relocated to walkable area NORTH of the central platform (was on the
         // platform itself, which is a forbidden zone — never route through!)
         NavNode(id: "Hof", displayNameKey: "node.courtyard", block: "Hof", floor: 0,
@@ -376,11 +357,11 @@ enum SchoolGraph {
 
         // ── Named rooms from floor plan (A-block) ──
         NavNode(id: "A001", displayNameKey: "node.a001", block: "A", floor: 0,
-                coordinate: GeoCoord(lat: 50.927245, lon: 6.995460), category: .special, isNavigable: true),
+                coordinate: GeoCoord(lat: 50.927248, lon: 6.995372), category: .special, isNavigable: true),
         NavNode(id: "A002", displayNameKey: "node.a002", block: "A", floor: 0,
-                coordinate: GeoCoord(lat: 50.927290, lon: 6.995380), category: .room, isNavigable: true),
+                coordinate: GeoCoord(lat: 50.927217, lon: 6.995463), category: .room, isNavigable: true),
         NavNode(id: "A003", displayNameKey: "node.a003", block: "A", floor: 0,
-                coordinate: GeoCoord(lat: 50.927140, lon: 6.995410), category: .special, isNavigable: true),
+                coordinate: GeoCoord(lat: 50.927185, lon: 6.995556), category: .special, isNavigable: true),
         NavNode(id: "A007", displayNameKey: "node.a007", block: "A", floor: 0,
                 coordinate: GeoCoord(lat: 50.927200, lon: 6.995540), category: .special, isNavigable: true),
 
@@ -392,7 +373,7 @@ enum SchoolGraph {
 
         // ── Named rooms from floor plan (D-block, near Aula) ──
         NavNode(id: "D002", displayNameKey: "node.d002", block: "Aula", floor: 0,
-                coordinate: GeoCoord(lat: 50.927790, lon: 6.996440), category: .special, isNavigable: true),
+                coordinate: GeoCoord(lat: 50.927593, lon: 6.996465), category: .special, isNavigable: true),
 
         // Elevator (mentioned in floor plan, lower-left A area)
         NavNode(id: "Aufzug-A", displayNameKey: "node.elevatorA", block: "A", floor: 0,
@@ -411,37 +392,6 @@ enum SchoolGraph {
         // < polygon western lon 6.996154 → just outside the polygon (path side).
         NavNode(id: "Fahrradabstellplatz", displayNameKey: "node.bikeParking", block: "Außen", floor: 0,
                 coordinate: GeoCoord(lat: 50.927935, lon: 6.996170), category: .bike, isNavigable: true),
-
-
-        // ── Hof ring mesh: 8 invisible waypoints AROUND the central platform ──
-        // Routes through Hof must follow this ring; never cross the platform.
-        NavNode(id: "HM-N",  displayNameKey: "node.hofMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927790, lon: 6.995600), category: .hallway, isNavigable: false),
-        NavNode(id: "HM-NE", displayNameKey: "node.hofMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927750, lon: 6.996050), category: .hallway, isNavigable: false),
-        NavNode(id: "HM-E",  displayNameKey: "node.hofMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927580, lon: 6.996150), category: .hallway, isNavigable: false),
-        NavNode(id: "HM-SE", displayNameKey: "node.hofMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927400, lon: 6.995960), category: .hallway, isNavigable: false),
-        NavNode(id: "HM-S",  displayNameKey: "node.hofMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927240, lon: 6.995680), category: .hallway, isNavigable: false),
-        NavNode(id: "HM-SW", displayNameKey: "node.hofMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927280, lon: 6.995420), category: .hallway, isNavigable: false),
-        NavNode(id: "HM-W",  displayNameKey: "node.hofMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927450, lon: 6.995160), category: .hallway, isNavigable: false),
-        NavNode(id: "HM-NW", displayNameKey: "node.hofMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927660, lon: 6.995300), category: .hallway, isNavigable: false),
-
-        // ── Outdoor mesh: bike-parking → school grounds ──
-        // Placed in the ~10m walkable strip BETWEEN Sport east edge (max lon 6.996039)
-        // and bike polygon west edge (min lon 6.996154). All three lons sit at 6.996070–
-        // 6.996100 which is outside both buildings; verified analytically.
-        NavNode(id: "BSP-1", displayNameKey: "node.outdoorMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.92794294492086, lon: 6.996016215167316), category: .hallway, isNavigable: false),
-        NavNode(id: "BSP-2", displayNameKey: "node.outdoorMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927850, lon: 6.995900), category: .hallway, isNavigable: false),
-        NavNode(id: "BSP-3", displayNameKey: "node.outdoorMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927753499384124, lon: 6.995743375749953), category: .hallway, isNavigable: false),
 
 
         // ── Door entry nodes (specific access doors at building edges) ──
@@ -543,623 +493,13 @@ enum SchoolGraph {
 
     static let nodes: [NavNode] = groundFloorNodes + upperFloorNodes
 
-    // MARK: - Corridor waypoint helpers
-    // B corridor centerline points (NW to SE)
-    private static let bCorridorNorth = GeoCoord(lat: 50.927850, lon: 6.995080)
-    private static let bCorridorMidN  = GeoCoord(lat: 50.927720, lon: 6.995010)
-    private static let bCorridorMid   = GeoCoord(lat: 50.927576, lon: 6.994962)
-    private static let bCorridorMidS  = GeoCoord(lat: 50.927450, lon: 6.994880)
-    private static let bCorridorSouth = GeoCoord(lat: 50.927320, lon: 6.994800)
-
-    // C corridor centerline points (NW to SE)
-    private static let cCorridorNorth = GeoCoord(lat: 50.927470, lon: 6.996160)
-    private static let cCorridorMidN  = GeoCoord(lat: 50.927350, lon: 6.996090)
-    private static let cCorridorMid   = GeoCoord(lat: 50.927214, lon: 6.996030)
-    private static let cCorridorMidS  = GeoCoord(lat: 50.927100, lon: 6.995930)
-    private static let cCorridorSouth = GeoCoord(lat: 50.926970, lon: 6.995810)
-
-    // MARK: - Ground Floor Edges
-    static let groundFloorEdges: [NavEdge] = [
-        // B rooms → nearest corridor segment
-        // North rooms (B1-B4) connect to FlurB-N
-        re("B1",  "FlurB-N", 4, "nav.goToCorridorB"), re("B2",  "FlurB-N", 4, "nav.goToCorridorB"),
-        re("B3",  "FlurB-N", 6, "nav.goToCorridorB"), re("B4",  "FlurB-N", 6, "nav.goToCorridorB"),
-        // Mid rooms (B5-B6) connect to FlurB-M
-        re("B5",  "FlurB-M", 5, "nav.goToCorridorB"), re("B6",  "FlurB-M", 5, "nav.goToCorridorB"),
-        // Mid-stair rooms (B7-B8) use MiddleB
-        re("B7",  "MiddleB", 5, "nav.goToMiddleB"),    re("B8",  "MiddleB", 5, "nav.goToMiddleB"),
-        // South rooms (B9-B12) connect to FlurB-S
-        re("B9",  "FlurB-S", 6, "nav.goToCorridorB"), re("B10", "FlurB-S", 6, "nav.goToCorridorB"),
-        re("B11", "FlurB-S", 4, "nav.goToCorridorB"), re("B12", "FlurB-S", 4, "nav.goToCorridorB"),
-
-        // Corridor segment chain
-        NavEdge(from: "FlurB-N", to: "FlurB-M", weight: 12,
-                instruction: "nav.continueCorridorB", reverseInstruction: "nav.continueCorridorB",
-                icon: "arrow.down", reverseIcon: "arrow.up", waypoints: []),
-        NavEdge(from: "FlurB-M", to: "FlurB-S", weight: 12,
-                instruction: "nav.continueCorridorB", reverseInstruction: "nav.continueCorridorB",
-                icon: "arrow.down", reverseIcon: "arrow.up", waypoints: []),
-        NavEdge(from: "FlurB-M", to: "MiddleB", weight: 3,
-                instruction: "nav.goToMiddleB", reverseInstruction: "nav.goToCorridorB",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-
-        // C rooms → nearest corridor segment
-        re("C1",  "FlurC-N", 4, "nav.goToCorridorC"), re("C2",  "FlurC-N", 4, "nav.goToCorridorC"),
-        re("C3",  "FlurC-N", 6, "nav.goToCorridorC"), re("C4",  "FlurC-N", 6, "nav.goToCorridorC"),
-        re("C5",  "FlurC-M", 5, "nav.goToCorridorC"), re("C6",  "FlurC-M", 5, "nav.goToCorridorC"),
-        re("C7",  "MiddleC", 5, "nav.goToMiddleC"),    re("C8",  "MiddleC", 5, "nav.goToMiddleC"),
-        re("C9",  "FlurC-S", 6, "nav.goToCorridorC"), re("C10", "FlurC-S", 6, "nav.goToCorridorC"),
-        re("C11", "FlurC-S", 4, "nav.goToCorridorC"), re("C12", "FlurC-S", 4, "nav.goToCorridorC"),
-
-        NavEdge(from: "FlurC-N", to: "FlurC-M", weight: 12,
-                instruction: "nav.continueCorridorC", reverseInstruction: "nav.continueCorridorC",
-                icon: "arrow.down", reverseIcon: "arrow.up", waypoints: []),
-        NavEdge(from: "FlurC-M", to: "FlurC-S", weight: 12,
-                instruction: "nav.continueCorridorC", reverseInstruction: "nav.continueCorridorC",
-                icon: "arrow.down", reverseIcon: "arrow.up", waypoints: []),
-        NavEdge(from: "FlurC-M", to: "MiddleC", weight: 3,
-                instruction: "nav.goToMiddleC", reverseInstruction: "nav.goToCorridorC",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-
-        // Building connections — stairs are at corridor ends, so connect to N/S segments
-        NavEdge(from: "FlurB-N", to: "SB-B-Sport", weight: 5,
-                instruction: "nav.goToStairsBSport", reverseInstruction: "nav.enterCorridorB",
-                icon: "arrow.up", reverseIcon: "arrow.down",
-                waypoints: [bCorridorNorth]),
-
-        NavEdge(from: "SB-B-Sport", to: "Umkleide", weight: 28,
-                instruction: "nav.goToChangingRoom", reverseInstruction: "nav.goToConnBSport",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-        NavEdge(from: "Umkleide", to: "Sporthalle", weight: 10,
-                instruction: "nav.enterGym", reverseInstruction: "nav.leaveGym",
-                icon: "door.left.hand.open", reverseIcon: "door.left.hand.open", waypoints: []),
-        NavEdge(from: "SB-B-Sport", to: "WC-SB-B-Sport", weight: 3,
-                instruction: "nav.wcRight", reverseInstruction: "nav.goToConnBSport",
-                icon: "figure.dress.line.vertical.figure", reverseIcon: "arrow.left", waypoints: []),
-
-        NavEdge(from: "FlurB-S", to: "SB-A-B", weight: 5,
-                instruction: "nav.goToStairsAB", reverseInstruction: "nav.enterCorridorB",
-                icon: "arrow.down", reverseIcon: "arrow.up",
-                waypoints: [bCorridorSouth]),
-
-        NavEdge(from: "SB-A-B", to: "A-Forum", weight: 8,
-                instruction: "nav.goToForum", reverseInstruction: "nav.goToConnAB",
-                icon: "arrow.left", reverseIcon: "arrow.right", waypoints: []),
-        NavEdge(from: "SB-A-B", to: "WC-SB-A-B", weight: 3,
-                instruction: "nav.wcLeft", reverseInstruction: "nav.goToConnAB",
-                icon: "figure.dress.line.vertical.figure", reverseIcon: "arrow.right", waypoints: []),
-
-        NavEdge(from: "A-Forum", to: "A-Kiosk", weight: 10,
-                instruction: "nav.goToKiosk", reverseInstruction: "nav.goToForum",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-        NavEdge(from: "A-Forum", to: "SB-A-C", weight: 15,
-                instruction: "nav.goToStairsAC", reverseInstruction: "nav.goToForum",
-                icon: "arrow.right", reverseIcon: "arrow.left",
-                waypoints: [GeoCoord(lat: 50.927150, lon: 6.995430), GeoCoord(lat: 50.927100, lon: 6.995540)]),
-
-        NavEdge(from: "SB-A-C", to: "FlurC-S", weight: 5,
-                instruction: "nav.enterCorridorC", reverseInstruction: "nav.goToConnAC",
-                icon: "arrow.right", reverseIcon: "arrow.left",
-                waypoints: [cCorridorSouth]),
-        NavEdge(from: "SB-A-C", to: "WC-SB-A-C", weight: 3,
-                instruction: "nav.wcRight", reverseInstruction: "nav.goToConnAC",
-                icon: "figure.dress.line.vertical.figure", reverseIcon: "arrow.left", waypoints: []),
-
-        NavEdge(from: "FlurC-N", to: "SB-C-Aula", weight: 5,
-                instruction: "nav.goToStairsCAula", reverseInstruction: "nav.enterCorridorC",
-                icon: "arrow.up", reverseIcon: "arrow.down",
-                waypoints: [cCorridorNorth]),
-
-        NavEdge(from: "SB-C-Aula", to: "Aula", weight: 10,
-                instruction: "nav.enterAula", reverseInstruction: "nav.leaveAula",
-                icon: "door.left.hand.open", reverseIcon: "door.left.hand.open", waypoints: []),
-        NavEdge(from: "SB-C-Aula", to: "WC-SB-C-Aula", weight: 3,
-                instruction: "nav.wcLeft", reverseInstruction: "nav.goToConnCAula",
-                icon: "figure.dress.line.vertical.figure", reverseIcon: "arrow.right", waypoints: []),
-
-        // Courtyard access now goes through the HM-* courtyard ring only.
-        // Removed old direct Hof→building edges because they could cut across
-        // the forbidden central Hof platform or through building polygons.
-
-        // Kiosk
-        NavEdge(from: "A-Kiosk", to: "SB-A-B", weight: 18,
-                instruction: "nav.goToStairsAB", reverseInstruction: "nav.goToKiosk",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-        NavEdge(from: "A-Kiosk", to: "SB-A-C", weight: 18,
-                instruction: "nav.goToStairsAC", reverseInstruction: "nav.goToKiosk",
-                icon: "arrow.left", reverseIcon: "arrow.right", waypoints: []),
-
-        // Upper floor A (existing)
-        NavEdge(from: "SB-A-B", to: "A-Exam", weight: 15,
-                instruction: "nav.stairsUpExam", reverseInstruction: "nav.stairsDownAB",
-                icon: "stairs", reverseIcon: "stairs", waypoints: []),
-        NavEdge(from: "SB-A-C", to: "A-Exam", weight: 15,
-                instruction: "nav.stairsUpExam", reverseInstruction: "nav.stairsDownAC",
-                icon: "stairs", reverseIcon: "stairs", waypoints: []),
-
-        // ── Outdoor approach: Eingang ↔ Parkplatz (along marked road)
-        NavEdge(from: "Eingang", to: "Parkplatz", weight: 32,
-                instruction: "nav.toParking", reverseInstruction: "nav.toEntrance",
-                icon: "car.fill", reverseIcon: "door.left.hand.open",
-                waypoints: [
-                    GeoCoord(lat: 50.927108, lon: 6.997100),
-                    GeoCoord(lat: 50.927202, lon: 6.996812),
-                ]),
-
-        // Inside connector after entering through the C/Aula door.
-        NavEdge(from: "Door-C-Aula", to: "WC-SB-C-Aula", weight: 2,
-                instruction: "nav.wcLeft", reverseInstruction: "nav.goToConnCAula",
-                icon: "door.left.hand.open", reverseIcon: "door.left.hand.open",
-                waypoints: []),
-        NavEdge(from: "Door-C-Aula", to: "SB-C-Aula", weight: 3,
-                instruction: "nav.goToStairsCAula", reverseInstruction: "nav.goToConnCAula",
-                icon: "door.left.hand.open", reverseIcon: "door.left.hand.open",
-                waypoints: []),
-
-        // Parking can also reach the courtyard ring without crossing the C/Aula block.
-        // This is used for routes from the parking side toward A/B/Hof without first
-        // going through Fahrradabstellplatz.
-        NavEdge(from: "Parkplatz", to: "HM-SE", weight: 95,
-                instruction: "nav.aroundCourtyard", reverseInstruction: "nav.toParking",
-                icon: "figure.walk", reverseIcon: "car.fill",
-                waypoints: [
-                    GeoCoord(lat: 50.927300, lon: 6.996520),
-                    GeoCoord(lat: 50.927355, lon: 6.996300),
-                    GeoCoord(lat: 50.927390, lon: 6.996080),
-                ]),
-
-        // ── Outdoor approach: Eingang ↔ Fahrradabstellplatz (foot path)
-        // Final waypoint added at (50.927780, 6.996500) — just south of the bike
-        // polygon S-corner (50.927807, 6.996548) — so the polyline routes AROUND
-        // the south side of the bike rack instead of crashing through it.
-        NavEdge(from: "Eingang", to: "Fahrradabstellplatz", weight: 42,
-                instruction: "nav.toBikeParking", reverseInstruction: "nav.toEntrance",
-                icon: "bicycle", reverseIcon: "door.left.hand.open",
-                waypoints: [
-                    GeoCoord(lat: 50.927232, lon: 6.997440),
-                    GeoCoord(lat: 50.927708, lon: 6.997286),
-                    GeoCoord(lat: 50.927877, lon: 6.996871),
-                    GeoCoord(lat: 50.927780, lon: 6.996500),
-                ]),
-
-        // (Removed: direct Fahrradabstellplatz → SB-B-Sport edge — its straight-line
-        // polyline cut through the Sporthalle building. Replaced below with a mesh
-        // path that goes south of the Sport block and through Door-Sporthalle.)
-
-        // ── Main pedestrian entrance (most arrive here on foot/bike)
-        // Final waypoint (50.928030, 6.996100) added — sits in the walkable strip
-        // WEST of the bike polygon (lon 6.996100 < bike west lon 6.996154), so the
-        // polyline reaches Fahrradabstellplatz without cutting through the bikes.
-        NavEdge(from: "Haupteingang", to: "Fahrradabstellplatz", weight: 35,
-                instruction: "nav.toBikeParking", reverseInstruction: "nav.toMainEntrance",
-                icon: "bicycle", reverseIcon: "door.garage.open",
-                waypoints: [
-                    GeoCoord(lat: 50.928490, lon: 6.996480),
-                    GeoCoord(lat: 50.928200, lon: 6.996420),
-                    GeoCoord(lat: 50.928030, lon: 6.996100),
-                ]),
-
-        // ── Hof ring mesh (chain — adjacent only, never crosses platform!) ──
-        NavEdge(from: "HM-N",  to: "HM-NE", weight: 6,
-                instruction: "nav.aroundCourtyard", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-        NavEdge(from: "HM-NE", to: "HM-E",  weight: 5,
-                instruction: "nav.aroundCourtyard", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.down", reverseIcon: "arrow.up",
-                waypoints: [GeoCoord(lat: 50.927675, lon: 6.996100)]),
-        NavEdge(from: "HM-E",  to: "HM-SE", weight: 5,
-                instruction: "nav.aroundCourtyard", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.down", reverseIcon: "arrow.up", waypoints: []),
-        NavEdge(from: "HM-SE", to: "HM-S",  weight: 5,
-                instruction: "nav.aroundCourtyard", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.left", reverseIcon: "arrow.right", waypoints: []),
-        NavEdge(from: "HM-S",  to: "HM-SW", weight: 5,
-                instruction: "nav.aroundCourtyard", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.left", reverseIcon: "arrow.right", waypoints: []),
-        NavEdge(from: "HM-SW", to: "HM-W",  weight: 5,
-                instruction: "nav.aroundCourtyard", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.up", reverseIcon: "arrow.down", waypoints: []),
-        NavEdge(from: "HM-W",  to: "HM-NW", weight: 5,
-                instruction: "nav.aroundCourtyard", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.up", reverseIcon: "arrow.down", waypoints: []),
-        NavEdge(from: "HM-NW", to: "HM-N",  weight: 5,
-                instruction: "nav.aroundCourtyard", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-
-        // ── Hof ring → building entries (each connection stays clear of buildings) ──
-        NavEdge(from: "HM-N",  to: "Door-Sporthalle", weight: 4,
-                instruction: "nav.toSporthalleDirect", reverseInstruction: "nav.aroundCourtyard",
-                icon: "figure.run", reverseIcon: "arrow.down",
-                // Along the visible walkable strip south/east of Sporthalle.
-                waypoints: [GeoCoord(lat: 50.927815, lon: 6.995710)]),
-        NavEdge(from: "WC-SB-B-Sport", to: "HM-N", weight: 5,
-                instruction: "nav.aroundCourtyard", reverseInstruction: "nav.wcRight",
-                icon: "figure.walk", reverseIcon: "figure.dress.line.vertical.figure",
-                // Real exterior shortcut from the WC-B/Sport entrance onto the Hof
-                // walkable ring. This prevents the router from using E009/Umkleide
-                // or the bike approach as a through-corridor.
-                waypoints: [GeoCoord(lat: 50.927835, lon: 6.995470)]),
-        NavEdge(from: "HM-N",  to: "Hof", weight: 3,
-                instruction: "nav.goToCourtyard", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-        NavEdge(from: "HM-NW", to: "MiddleB", weight: 8,
-                instruction: "nav.goToMiddleB", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.left", reverseIcon: "arrow.right", waypoints: []),
-        NavEdge(from: "HM-W",  to: "MiddleB", weight: 8,
-                instruction: "nav.goToMiddleB", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.left", reverseIcon: "arrow.right", waypoints: []),
-        NavEdge(from: "HM-SW", to: "SB-A-B", weight: 8,
-                instruction: "nav.goToStairsAB", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.down", reverseIcon: "arrow.up", waypoints: []),
-        NavEdge(from: "HM-S",  to: "Door-Mensa-EG", weight: 5,
-                instruction: "nav.toMensaEG", reverseInstruction: "nav.aroundCourtyard",
-                icon: "fork.knife", reverseIcon: "arrow.up", waypoints: []),
-        NavEdge(from: "HM-S",  to: "SB-A-C", weight: 9,
-                instruction: "nav.goToStairsAC", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.down", reverseIcon: "arrow.up", waypoints: []),
-        NavEdge(from: "HM-SE", to: "MiddleC", weight: 8,
-                instruction: "nav.goToMiddleC", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-        NavEdge(from: "HM-E",  to: "FlurC-N", weight: 6,
-                instruction: "nav.enterCorridorC", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-        NavEdge(from: "HM-E",  to: "SB-C-Aula", weight: 4,
-                instruction: "nav.goToStairsCAula", reverseInstruction: "nav.aroundCourtyard",
-                icon: "arrow.right", reverseIcon: "arrow.left",
-                // Enter C/Aula at the real WC-SB-C-Aula door after approaching from the Hof green area.
-                waypoints: [GeoCoord(lat: 50.927590, lon: 6.996205)]),
-
-        // ── Bike-path mesh: Fahrradabstellplatz → Door-Sporthalle (south of Sport block) ──
-        NavEdge(from: "Fahrradabstellplatz", to: "BSP-1", weight: 5,
-                instruction: "nav.fromBikeToBuilding", reverseInstruction: "nav.toBikeParking",
-                icon: "arrow.down", reverseIcon: "arrow.up",
-                // Follow the GREEN walkable bike→school polygon; do not draw through the Aula/D002 block.
-                waypoints: [GeoCoord(lat: 50.927935, lon: 6.996100)]),
-        NavEdge(from: "BSP-1", to: "BSP-2", weight: 6,
-                instruction: "nav.fromBikeToBuilding", reverseInstruction: "nav.toBikeParking",
-                icon: "arrow.left", reverseIcon: "arrow.right",
-                waypoints: [GeoCoord(lat: 50.927900, lon: 6.995955)]),
-        NavEdge(from: "BSP-2", to: "BSP-3", weight: 6,
-                instruction: "nav.fromBikeToBuilding", reverseInstruction: "nav.toBikeParking",
-                icon: "arrow.left", reverseIcon: "arrow.right",
-                waypoints: [GeoCoord(lat: 50.927805, lon: 6.995820)]),
-        NavEdge(from: "BSP-3", to: "Door-Sporthalle", weight: 4,
-                instruction: "nav.toSporthalleDirect", reverseInstruction: "nav.fromBikeToBuilding",
-                icon: "figure.run", reverseIcon: "arrow.right", waypoints: []),
-        // From bike-path, also reach the Hof ring NE
-        NavEdge(from: "BSP-3", to: "HM-NE", weight: 8,
-                instruction: "nav.aroundCourtyard", reverseInstruction: "nav.fromBikeToBuilding",
-                icon: "arrow.down", reverseIcon: "arrow.up",
-                // Green walkable area connector from bike path into the Hof ring.
-                // This is the correct way from Parkplatz-Eingang/Fahrradbereich toward Aula.
-                waypoints: [
-                    GeoCoord(lat: 50.927740, lon: 6.995850),
-                    GeoCoord(lat: 50.927735, lon: 6.995970)
-                ]),
-
-        // ── Door-Sporthalle: shortest path INTO Sporthalle/Umkleide ──
-        NavEdge(from: "Door-Sporthalle", to: "Sporthalle", weight: 6,
-                instruction: "nav.enterGym", reverseInstruction: "nav.leaveGym",
-                icon: "door.left.hand.open", reverseIcon: "door.left.hand.open", waypoints: []),
-        NavEdge(from: "Door-Sporthalle", to: "Umkleide", weight: 4,
-                instruction: "nav.goToChangingRoom", reverseInstruction: "nav.leaveGym",
-                icon: "door.left.hand.open", reverseIcon: "arrow.right", waypoints: []),
-
-        // ── Door-Mensa-EG: shortest path INTO Forum/Cafeteria ──
-        NavEdge(from: "Door-Mensa-EG", to: "A-Forum", weight: 4,
-                instruction: "nav.goToForum", reverseInstruction: "nav.toMensaEG",
-                icon: "door.left.hand.open", reverseIcon: "door.left.hand.open", waypoints: []),
-        NavEdge(from: "Door-Mensa-EG", to: "A-Kiosk", weight: 7,
-                instruction: "nav.goToKiosk", reverseInstruction: "nav.toMensaEG",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-
-        // ── Named A-block rooms ──
-        re("A001", "A-Forum", 5, "nav.goToForum"),
-        re("A002", "A-Forum", 8, "nav.goToForum"),
-        re("A003", "SB-A-B",  6, "nav.goToStairsAB"),
-        re("A007", "A-Kiosk", 4, "nav.goToKiosk"),
-
-        // Elevator A
-        NavEdge(from: "Aufzug-A", to: "SB-A-B", weight: 4,
-                instruction: "nav.toStairsAB", reverseInstruction: "nav.toElevatorA",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-        NavEdge(from: "Aufzug-A", to: "A-Forum", weight: 6,
-                instruction: "nav.goToForum", reverseInstruction: "nav.toElevatorA",
-                icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []),
-
-        // ── E-block rooms (near Sporthalle / SB-B-Sport) ──
-        re("E009", "SB-B-Sport", 4, "nav.toStairsBSport"),
-        re("E010", "SB-B-Sport", 5, "nav.toStairsBSport"),
-
-        // ── D-block (Stuhllager near Aula) ──
-        re("D002", "Aula", 4, "nav.enterAula"),
-    ]
-
-    // MARK: - Upper Floor Edges
-    static let upperFloorEdges: [NavEdge] = {
-        var edges = [NavEdge]()
-
-        // Stairs up — connect each staircase to the closest corridor segment on OG
-        edges.append(NavEdge(from: "SB-B-Sport", to: "FlurB-OG-N", weight: 8,
-                             instruction: "nav.stairsUpCorridorB", reverseInstruction: "nav.stairsDownCorridorB",
-                             icon: "stairs", reverseIcon: "stairs",
-                             waypoints: [bCorridorNorth]))
-        edges.append(NavEdge(from: "SB-A-B", to: "FlurB-OG-S", weight: 8,
-                             instruction: "nav.stairsUpCorridorB", reverseInstruction: "nav.stairsDownCorridorB",
-                             icon: "stairs", reverseIcon: "stairs",
-                             waypoints: [bCorridorSouth]))
-        edges.append(NavEdge(from: "SB-A-C", to: "FlurC-OG-S", weight: 8,
-                             instruction: "nav.stairsUpCorridorC", reverseInstruction: "nav.stairsDownCorridorC",
-                             icon: "stairs", reverseIcon: "stairs",
-                             waypoints: [cCorridorSouth]))
-        edges.append(NavEdge(from: "SB-C-Aula", to: "FlurC-OG-N", weight: 8,
-                             instruction: "nav.stairsUpCorridorC", reverseInstruction: "nav.stairsDownCorridorC",
-                             icon: "stairs", reverseIcon: "stairs",
-                             waypoints: [cCorridorNorth]))
-
-        // Upper corridor segment chain
-        edges.append(NavEdge(from: "FlurB-OG-N", to: "FlurB-OG-M", weight: 12,
-                             instruction: "nav.continueCorridorB", reverseInstruction: "nav.continueCorridorB",
-                             icon: "arrow.down", reverseIcon: "arrow.up", waypoints: []))
-        edges.append(NavEdge(from: "FlurB-OG-M", to: "FlurB-OG-S", weight: 12,
-                             instruction: "nav.continueCorridorB", reverseInstruction: "nav.continueCorridorB",
-                             icon: "arrow.down", reverseIcon: "arrow.up", waypoints: []))
-        edges.append(NavEdge(from: "FlurB-OG-M", to: "MiddleB-OG", weight: 3,
-                             instruction: "nav.goToMiddleBOG", reverseInstruction: "nav.goToCorridorBOG",
-                             icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []))
-
-        edges.append(NavEdge(from: "FlurC-OG-N", to: "FlurC-OG-M", weight: 12,
-                             instruction: "nav.continueCorridorC", reverseInstruction: "nav.continueCorridorC",
-                             icon: "arrow.down", reverseIcon: "arrow.up", waypoints: []))
-        edges.append(NavEdge(from: "FlurC-OG-M", to: "FlurC-OG-S", weight: 12,
-                             instruction: "nav.continueCorridorC", reverseInstruction: "nav.continueCorridorC",
-                             icon: "arrow.down", reverseIcon: "arrow.up", waypoints: []))
-        edges.append(NavEdge(from: "FlurC-OG-M", to: "MiddleC-OG", weight: 3,
-                             instruction: "nav.goToMiddleCOG", reverseInstruction: "nav.goToCorridorCOG",
-                             icon: "arrow.right", reverseIcon: "arrow.left", waypoints: []))
-
-        // B upper floor rooms → nearest upper corridor segment
-        let bMap: [(Int, String, String)] = [
-            (1, "FlurB-OG-N", "nav.goToCorridorBOG"), (2, "FlurB-OG-N", "nav.goToCorridorBOG"),
-            (3, "FlurB-OG-N", "nav.goToCorridorBOG"), (4, "FlurB-OG-N", "nav.goToCorridorBOG"),
-            (5, "FlurB-OG-M", "nav.goToCorridorBOG"), (6, "FlurB-OG-M", "nav.goToCorridorBOG"),
-            (7, "MiddleB-OG",  "nav.goToMiddleBOG"),  (8, "MiddleB-OG",  "nav.goToMiddleBOG"),
-            (9, "FlurB-OG-S", "nav.goToCorridorBOG"), (10,"FlurB-OG-S", "nav.goToCorridorBOG"),
-            (11,"FlurB-OG-S", "nav.goToCorridorBOG"), (12,"FlurB-OG-S", "nav.goToCorridorBOG"),
-        ]
-        let weights: [Double] = [4,4,6,6,5,5,5,5,6,6,4,4]
-        for (i, corridor, instrKey) in bMap {
-            edges.append(re("B\(i)-OG", corridor, weights[i-1], instrKey))
-        }
-
-        let cMap: [(Int, String, String)] = [
-            (1, "FlurC-OG-N", "nav.goToCorridorCOG"), (2, "FlurC-OG-N", "nav.goToCorridorCOG"),
-            (3, "FlurC-OG-N", "nav.goToCorridorCOG"), (4, "FlurC-OG-N", "nav.goToCorridorCOG"),
-            (5, "FlurC-OG-M", "nav.goToCorridorCOG"), (6, "FlurC-OG-M", "nav.goToCorridorCOG"),
-            (7, "MiddleC-OG",  "nav.goToMiddleCOG"),  (8, "MiddleC-OG",  "nav.goToMiddleCOG"),
-            (9, "FlurC-OG-S", "nav.goToCorridorCOG"), (10,"FlurC-OG-S", "nav.goToCorridorCOG"),
-            (11,"FlurC-OG-S", "nav.goToCorridorCOG"), (12,"FlurC-OG-S", "nav.goToCorridorCOG"),
-        ]
-        for (i, corridor, instrKey) in cMap {
-            edges.append(re("C\(i)-OG", corridor, weights[i-1], instrKey))
-        }
-
-        return edges
-    }()
-
-    static let edges: [NavEdge] = groundFloorEdges + upperFloorEdges
-
-    // MARK: - Adjacency
-    struct AdjEntry {
-        let neighbor: String
-        let weight: Double
-        let instruction: String
-        let icon: String
-        let waypoints: [GeoCoord]
-    }
-
-    static let adjacency: [String: [AdjEntry]] = {
-        var adj = [String: [AdjEntry]]()
-        for edge in edges {
-            adj[edge.from, default: []].append(AdjEntry(
-                neighbor: edge.to, weight: edge.weight,
-                instruction: edge.instruction, icon: edge.icon, waypoints: edge.waypoints))
-            adj[edge.to, default: []].append(AdjEntry(
-                neighbor: edge.from, weight: edge.weight,
-                instruction: edge.reverseInstruction, icon: edge.reverseIcon,
-                waypoints: edge.waypoints.reversed()))
-        }
-        return adj
-    }()
-
     static func node(by id: String) -> NavNode? { nodes.first { $0.id == id } }
     static var selectableNodes: [NavNode] { nodes.filter { $0.isNavigable } }
 
-    // MARK: - Route geometry validation
-
-    private static func isOutdoorLike(_ node: NavNode) -> Bool {
-        node.block == "Außen" || node.block == "Hof" || node.block.isEmpty ||
-        node.category == .courtyard || node.category == .parking || node.category == .bike || node.category == .entrance
-    }
-
-    private static func point(_ p: GeoCoord, inside polygon: [GeoCoord]) -> Bool {
-        guard polygon.count >= 3 else { return false }
-        var isInside = false
-        var j = polygon.count - 1
-        for i in 0..<polygon.count {
-            let pi = polygon[i]
-            let pj = polygon[j]
-            let crossesY = (pi.lat > p.lat) != (pj.lat > p.lat)
-            if crossesY {
-                let xAtY = (pj.lon - pi.lon) * (p.lat - pi.lat) / ((pj.lat - pi.lat) + 0.000000000001) + pi.lon
-                if p.lon < xAtY { isInside.toggle() }
-            }
-            j = i
-        }
-        return isInside
-    }
-
-    private static func orientation(_ a: GeoCoord, _ b: GeoCoord, _ c: GeoCoord) -> Double {
-        (b.lon - a.lon) * (c.lat - a.lat) - (b.lat - a.lat) * (c.lon - a.lon)
-    }
-
-    private static func onSegment(_ a: GeoCoord, _ b: GeoCoord, _ p: GeoCoord) -> Bool {
-        let eps = 0.0000000001
-        return min(a.lon, b.lon) - eps <= p.lon && p.lon <= max(a.lon, b.lon) + eps &&
-               min(a.lat, b.lat) - eps <= p.lat && p.lat <= max(a.lat, b.lat) + eps &&
-               abs(orientation(a, b, p)) < eps
-    }
-
-    private static func segmentsIntersect(_ a: GeoCoord, _ b: GeoCoord, _ c: GeoCoord, _ d: GeoCoord) -> Bool {
-        let o1 = orientation(a, b, c)
-        let o2 = orientation(a, b, d)
-        let o3 = orientation(c, d, a)
-        let o4 = orientation(c, d, b)
-        if (o1 > 0) != (o2 > 0), (o3 > 0) != (o4 > 0) { return true }
-        return onSegment(a, b, c) || onSegment(a, b, d) || onSegment(c, d, a) || onSegment(c, d, b)
-    }
-
-    private static func segment(_ a: GeoCoord, _ b: GeoCoord, intersects polygon: [GeoCoord]) -> Bool {
-        guard polygon.count >= 3 else { return false }
-        if point(a, inside: polygon) || point(b, inside: polygon) { return true }
-        for i in 0..<polygon.count {
-            let c = polygon[i]
-            let d = polygon[(i + 1) % polygon.count]
-            if segmentsIntersect(a, b, c, d) { return true }
-        }
-        return false
-    }
-
-    private static func segment(_ a: GeoCoord, _ b: GeoCoord, intersectsLine line: [GeoCoord]) -> Bool {
-        guard line.count >= 2 else { return false }
-        for i in 1..<line.count {
-            if segmentsIntersect(a, b, line[i - 1], line[i]) { return true }
-        }
-        return false
-    }
-
-    private static func isDoorNode(_ node: NavNode) -> Bool {
-        node.id.hasPrefix("Door-")
-    }
-
-    private static func segmentUsesDoorEndpoint(_ a: GeoCoord, _ b: GeoCoord, _ fromNode: NavNode, _ toNode: NavNode) -> Bool {
-        // Entering/leaving a building may touch the wall exactly at an explicit Door-* node.
-        // That is intentional; random intersections elsewhere are still logged.
-        return isDoorNode(fromNode) || isDoorNode(toNode)
-    }
-
-    private static func polyline(for edge: NavEdge) -> [GeoCoord]? {
-        guard let from = node(by: edge.from), let to = node(by: edge.to) else { return nil }
-        return [from.coordinate] + edge.waypoints + [to.coordinate]
-    }
-
-    static func validateRouteGeometry() {
-        guard routeDebugLoggingEnabled else { return }
-        var issueCount = 0
-        let indoorBlocks: Set<String> = ["A", "B", "C", "Sport", "Aula"]
-
-        for edge in edges {
-            guard let fromNode = node(by: edge.from),
-                  let toNode = node(by: edge.to),
-                  let coords = polyline(for: edge),
-                  coords.count >= 2 else {
-                print("❌ ROUTE GRAPH: missing node for edge \(edge.from) → \(edge.to)")
-                issueCount += 1
-                continue
-            }
-
-            for i in 1..<coords.count {
-                let a = coords[i - 1]
-                let b = coords[i]
-
-                for forbidden in forbiddenAreas where segment(a, b, intersects: forbidden.corners) {
-                    print("❌ ROUTE GEOMETRY: \(edge.from) → \(edge.to) crosses forbidden area \(forbidden.id)")
-                    issueCount += 1
-                }
-
-                if segment(a, b, intersectsLine: physicalWallLine),
-                   !segmentUsesDoorEndpoint(a, b, fromNode, toNode) {
-                    print("❌ ROUTE GEOMETRY: \(edge.from) → \(edge.to) crosses physical wall line")
-                    issueCount += 1
-                }
-
-                // Building polygons are allowed for indoor edges. Only warn when an
-                // outdoor/helper edge crosses an unrelated building footprint.
-                if isOutdoorLike(fromNode) || isOutdoorLike(toNode) {
-                    for building in buildingOutlines {
-                        let edgeIsInsideItsOwnBuilding = indoorBlocks.contains(fromNode.block) && fromNode.block == building.id ||
-                                                          indoorBlocks.contains(toNode.block) && toNode.block == building.id
-                        if !edgeIsInsideItsOwnBuilding && !segmentUsesDoorEndpoint(a, b, fromNode, toNode) && segment(a, b, intersects: building.corners) {
-                            print("❌ ROUTE GEOMETRY: \(edge.from) → \(edge.to) crosses building \(building.id)")
-                            issueCount += 1
-                        }
-                    }
-                }
-            }
-
-            if edge.waypoints.isEmpty && (isOutdoorLike(fromNode) || isOutdoorLike(toNode)) {
-                let from = CLLocation(latitude: fromNode.coordinate.lat, longitude: fromNode.coordinate.lon)
-                let to = CLLocation(latitude: toNode.coordinate.lat, longitude: toNode.coordinate.lon)
-                if from.distance(from: to) > 25 {
-                    print("⚠️ ROUTE GEOMETRY: long outdoor/helper edge without waypoints: \(edge.from) → \(edge.to)")
-                }
-            }
-        }
-
-        if issueCount == 0 {
-            print("✅ ROUTE GEOMETRY: no forbidden/building crossings detected in checked outdoor/helper edges")
-        } else {
-            print("❌ ROUTE GEOMETRY: \(issueCount) issue(s) detected")
-        }
-    }
-
-    // MARK: - Routing cost policy
-
-    private static func isTransitDeadEndCategory(_ category: NavNode.NodeCategory) -> Bool {
-        switch category {
-        case .room, .special, .sport, .food:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private static func isBikeApproachNode(_ id: String) -> Bool {
-        id == "Fahrradabstellplatz" || id.hasPrefix("BSP-")
-    }
-
-    private static func routeUsesBikeApproach(_ startID: String, _ endID: String) -> Bool {
-        let bikeRelevant: Set<String> = ["Fahrradabstellplatz", "Haupteingang", "Eingang"]
-        return bikeRelevant.contains(startID) || bikeRelevant.contains(endID)
-    }
-
-    private static func dynamicPenalty(current: String, neighbor: String, startID: String, endID: String) -> Double {
-        guard let neighborNode = node(by: neighbor) else { return 0 }
-
-        // Rooms and destinations may be start/end, but they should not be used as
-        // shortcuts. This fixes routes like WC (B/Sport) → Aula that previously
-        // walked through Umkleide/Sporthalle just because that edge was cheap.
-        if neighbor != endID && neighbor != startID && isTransitDeadEndCategory(neighborNode.category) {
-            return 900
-        }
-
-        // The BSP nodes are only the bike approach from Fahrradabstellplatz/entrances.
-        // For building-to-building routes, strongly prefer the Hof ring mesh.
-        if isBikeApproachNode(neighbor) && !routeUsesBikeApproach(startID, endID) {
-            return 500
-        }
-
-        // Do not use the visual center of the car parking as a transit shortcut.
-        // The grey walkable overlays describe the path around the parking area; the
-        // center point is only a selectable destination/start, not a through-node.
-        if neighbor == "Parkplatz" && neighbor != endID && current != "Parkplatz" {
-            return 700
-        }
-
-        return 0
-    }
-
-    // MARK: - Dijkstra
+    // MARK: - Routing
+    // Routes are computed on the walkability grid generated from the CAD floor plan
+    // (see SchoolGridRouter / Tools/school-grid). Walls, the Hof pit and closed facades are
+    // blocked cells there, so a route can never cut through a building.
     static func findRoute(from startID: String, to endID: String) -> [NavStep] {
         guard let startNode = node(by: startID), let endNode = node(by: endID) else {
             return [NavStep(instruction: L.s("nav.roomNotFound"), icon: "xmark.circle", coordinate: nil, pathCoordinates: [], floor: 0)]
@@ -1168,66 +508,9 @@ enum SchoolGraph {
             return [NavStep(instruction: L.s("nav.alreadyHere"), icon: "checkmark.circle.fill",
                             coordinate: startNode.coordinate, pathCoordinates: [], floor: startNode.floor)]
         }
-
-        var dist = [String: Double]()
-        var prev = [String: String]()
-        var edgeUsed = [String: (String, String, [GeoCoord])]()
-        var visited = Set<String>()
-        dist[startID] = 0
-
-        while true {
-            let candidate = dist.filter { !visited.contains($0.key) }.min(by: { $0.value < $1.value })
-            guard let (current, currentDist) = candidate else { break }
-            if current == endID { break }
-            visited.insert(current)
-            for entry in adjacency[current] ?? [] {
-                let newDist = currentDist + entry.weight + dynamicPenalty(current: current, neighbor: entry.neighbor, startID: startID, endID: endID)
-                if newDist < (dist[entry.neighbor] ?? .infinity) {
-                    dist[entry.neighbor] = newDist
-                    prev[entry.neighbor] = current
-                    edgeUsed[entry.neighbor] = (entry.instruction, entry.icon, entry.waypoints)
-                }
-            }
-        }
-
-        guard dist[endID] != nil else {
+        guard let steps = SchoolGridRouter.shared?.route(from: startNode, to: endNode) else {
             return [NavStep(instruction: L.s("nav.noRoute"), icon: "exclamationmark.triangle", coordinate: nil, pathCoordinates: [], floor: 0)]
         }
-
-        var path = [String]()
-        var cur = endID
-        while cur != startID { path.append(cur); guard let p = prev[cur] else { break }; cur = p }
-        path.append(startID); path.reverse()
-
-        if routeDebugLoggingEnabled {
-            print("🧭 ROUTE PATH:", path.joined(separator: " → "))
-        }
-
-        var steps = [NavStep]()
-        steps.append(NavStep(instruction: "\(L.s("nav.start")): \(startNode.displayName)",
-                             icon: "location.circle.fill", coordinate: startNode.coordinate,
-                             pathCoordinates: [startNode.coordinate], floor: startNode.floor))
-
-        for i in 1..<path.count {
-            let nodeID = path[i]
-            let n = node(by: nodeID)
-            let (instrKey, icon, wps) = edgeUsed[nodeID] ?? ("nav.continue", "arrow.forward", [])
-
-            var seg = [GeoCoord]()
-            if let prevN = node(by: path[i - 1]) { seg.append(prevN.coordinate) }
-            seg.append(contentsOf: wps)
-            if let thisN = n { seg.append(thisN.coordinate) }
-
-            let resolved = instrKey == "nav.goToRoom" ? "\(L.s("nav.goToRoom")) \(nodeID)" : L.s(instrKey)
-            steps.append(NavStep(instruction: resolved, icon: icon, coordinate: n?.coordinate,
-                                 pathCoordinates: seg, floor: n?.floor ?? 0))
-        }
-
-        let minutes = max(1, Int(dist[endID] ?? 0) / 60)
-        steps.append(NavStep(
-            instruction: "\(L.s("nav.arrived")): \(endNode.displayName) (~\(minutes) \(L.s("nav.approxMin")))",
-            icon: "checkmark.circle.fill", coordinate: endNode.coordinate, pathCoordinates: [],
-            floor: endNode.floor))
         return steps
     }
 }
@@ -1365,12 +648,6 @@ struct IndoorNavView: View {
     @State private var pendingGPSCoord: CLLocationCoordinate2D?
     @State private var locating = false
 
-    // Persistent, Apple Maps-style bottom sheet — never dismissed, only resized.
-    @State private var showRouteSheet = true
-    @State private var sheetDetent: PresentationDetent = .height(130)
-    private let sheetCollapsedHeight: CGFloat = 130
-    private let sheetNavHeight: CGFloat = 92
-
     private let arrivalThreshold: Double = 12.0
     private let haptics = UIImpactFeedbackGenerator(style: .medium)
     private let lightHaptics = UIImpactFeedbackGenerator(style: .light)
@@ -1383,32 +660,25 @@ struct IndoorNavView: View {
             mapView
                 .ignoresSafeArea(edges: .bottom)
 
-            if isActivelyNavigating {
-                navigationCard
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-
             VStack(spacing: 10) {
-                Spacer()
+                if isActivelyNavigating {
+                    navigationCard
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
+                Spacer(minLength: 0)
+
+                // Floor toggle pinned to the trailing edge, directly above the bottom panel
                 floorToggle
-                locateMeButton
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+
+                bottomPanel
             }
-            .padding(.trailing, 12)
-            .padding(.bottom, (isActivelyNavigating ? sheetNavHeight : sheetCollapsedHeight) + 16)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
         }
         .animation(.easeInOut(duration: 0.25), value: isActivelyNavigating)
-        .sheet(isPresented: $showRouteSheet) {
-            routeSheetContent
-                .presentationDetents(
-                    [.height(sheetNavHeight), .height(sheetCollapsedHeight), .medium, .large],
-                    selection: $sheetDetent
-                )
-                .presentationDragIndicator(.visible)
-                .presentationBackgroundInteraction(.enabled(upThrough: .large))
-                .interactiveDismissDisabled()
-        }
         .sheet(isPresented: $showStartPicker) {
             NodePickerView(selectedNode: $startNode, title: L.s("nav.selectStart"),
                            accentColor: GSOColors.primary, locationManager: locationManager)
@@ -1449,24 +719,11 @@ struct IndoorNavView: View {
                 withAnimation(.easeInOut(duration: 0.3)) { selectedFloor = route[newIdx].floor }
             }
         }
-        .onChange(of: isNavigating) { _, _ in syncSheetDetent() }
-        .onChange(of: isDemoMode) { _, _ in syncSheetDetent() }
         .onReceive(locationManager.$lastLocation) { loc in
             guard isNavigating, !isDemoMode, let loc = loc else { return }
             updateNavigation(userLocation: loc)
         }
-        .onAppear { SchoolGraph.validateRouteGeometry() }
         .onDisappear { stopAll() }
-    }
-
-    private func syncSheetDetent() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-            if isActivelyNavigating {
-                sheetDetent = .height(sheetNavHeight)
-            } else {
-                sheetDetent = route.isEmpty ? .height(sheetCollapsedHeight) : .medium
-            }
-        }
     }
 
     // MARK: - Navigation Card (turn-by-turn, Apple Maps-style top banner)
@@ -1567,24 +824,6 @@ struct IndoorNavView: View {
         .buttonStyle(.plain)
     }
 
-    private var locateMeButton: some View {
-        Button { locateUser() } label: {
-            ZStack {
-                if locating {
-                    ProgressView().progressViewStyle(.circular).tint(GSOColors.primary).scaleEffect(0.7)
-                } else {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(GSOColors.primary)
-                }
-            }
-            .frame(width: 44, height: 44)
-        }
-        .buttonStyle(.plain)
-        .gsoFloatingButton()
-        .disabled(locating)
-    }
-
     // MARK: - Map
 
     private var mapView: some View {
@@ -1678,7 +917,7 @@ struct IndoorNavView: View {
                 }
             }
         }
-        .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
+        .mapStyle(.hybrid(elevation: .realistic))
         .accessibilityHidden(accessibilityMode)
     }
 
@@ -1702,27 +941,21 @@ struct IndoorNavView: View {
         return coords
     }
 
-    // MARK: - Bottom Sheet (Apple Maps-style)
+    // MARK: - Bottom Panel (inline card, always visible above the tab bar)
 
-    @ViewBuilder
-    private var routeSheetContent: some View {
-        if isActivelyNavigating {
-            navActiveBar
-                .padding(.horizontal, 16)
-                .padding(.top, 14)
-        } else {
-            ScrollView {
-                VStack(spacing: 14) {
-                    searchFields
-                    if !route.isEmpty {
-                        routeSummaryCard
-                    }
+    private var bottomPanel: some View {
+        VStack(spacing: 14) {
+            if isActivelyNavigating {
+                navActiveBar
+            } else {
+                searchFields
+                if !route.isEmpty {
+                    routeSummaryCard
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 14)
-                .padding(.bottom, 24)
             }
         }
+        .padding(14)
+        .gsoFloatingCard(radius: GSOMetrics.sheetRadius)
     }
 
     private var navActiveBar: some View {
@@ -1798,7 +1031,6 @@ struct IndoorNavView: View {
                     if let s = startNode, let e = endNode {
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                             route = SchoolGraph.findRoute(from: s.id, to: e.id)
-                            sheetDetent = .medium
                         }
                         directionsExpanded = false
                     }
@@ -1863,7 +1095,6 @@ struct IndoorNavView: View {
                     lightHaptics.impactOccurred()
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         route = []
-                        sheetDetent = .height(sheetCollapsedHeight)
                     }
                 } label: {
                     Image(systemName: "xmark")
