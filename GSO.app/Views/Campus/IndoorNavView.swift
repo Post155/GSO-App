@@ -1361,37 +1361,49 @@ struct IndoorNavView: View {
     @State private var pendingGPSCoord: CLLocationCoordinate2D?
     @State private var locating = false
 
-    @Environment(\.horizontalSizeClass) private var hSizeClass
+    // Persistent, Apple Maps-style bottom sheet — never dismissed, only resized.
+    @State private var showRouteSheet = true
+    @State private var sheetDetent: PresentationDetent = .height(130)
+    private let sheetCollapsedHeight: CGFloat = 130
+    private let sheetNavHeight: CGFloat = 92
 
     private let arrivalThreshold: Double = 12.0
     private let haptics = UIImpactFeedbackGenerator(style: .medium)
     private let lightHaptics = UIImpactFeedbackGenerator(style: .light)
     private let successHaptics = UINotificationFeedbackGenerator()
 
+    private var isActivelyNavigating: Bool { isNavigating || isDemoMode }
+
     var body: some View {
         ZStack(alignment: .top) {
             mapView
                 .ignoresSafeArea(edges: .bottom)
 
-            VStack(spacing: 0) {
-                topBar
-
-                Spacer()
-
-                // Floor toggle + directions
-                VStack(spacing: 6) {
-                    HStack {
-                        floorToggle
-                        Spacer()
-                    }
+            if isActivelyNavigating {
+                navigationCard
                     .padding(.horizontal, 12)
-
-                    if !isNavigating && !isDemoMode && !route.isEmpty {
-                        directionsPanel
-                    }
-                }
-                .padding(.bottom, 6)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
+
+            VStack(spacing: 10) {
+                Spacer()
+                floorToggle
+                locateMeButton
+            }
+            .padding(.trailing, 12)
+            .padding(.bottom, (isActivelyNavigating ? sheetNavHeight : sheetCollapsedHeight) + 16)
+        }
+        .animation(.easeInOut(duration: 0.25), value: isActivelyNavigating)
+        .sheet(isPresented: $showRouteSheet) {
+            routeSheetContent
+                .presentationDetents(
+                    [.height(sheetNavHeight), .height(sheetCollapsedHeight), .medium, .large],
+                    selection: $sheetDetent
+                )
+                .presentationDragIndicator(.visible)
+                .presentationBackgroundInteraction(.enabled(upThrough: .large))
+                .interactiveDismissDisabled()
         }
         .sheet(isPresented: $showStartPicker) {
             NodePickerView(selectedNode: $startNode, title: L.s("nav.selectStart"),
@@ -1433,6 +1445,8 @@ struct IndoorNavView: View {
                 withAnimation(.easeInOut(duration: 0.3)) { selectedFloor = route[newIdx].floor }
             }
         }
+        .onChange(of: isNavigating) { _, _ in syncSheetDetent() }
+        .onChange(of: isDemoMode) { _, _ in syncSheetDetent() }
         .onReceive(locationManager.$lastLocation) { loc in
             guard isNavigating, !isDemoMode, let loc = loc else { return }
             updateNavigation(userLocation: loc)
@@ -1441,129 +1455,130 @@ struct IndoorNavView: View {
         .onDisappear { stopAll() }
     }
 
-    // MARK: - Top bar (header + controls)
-
-    @ViewBuilder
-    private var topBar: some View {
-        // Always side-by-side: brand label LEFT (top-aligned), controls RIGHT.
-        // No maxHeight stretching — GSO sizes to its content.
-        HStack(alignment: .top, spacing: 8) {
-            if hSizeClass == .regular {
-                GSOHeader(compact: true)
-                    .frame(width: 230)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
-                    )
+    private func syncSheetDetent() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            if isActivelyNavigating {
+                sheetDetent = .height(sheetNavHeight)
             } else {
-                miniGSOLabel
-            }
-
-            if isNavigating || isDemoMode {
-                navigationCard
-                    .frame(maxWidth: .infinity)
-            } else {
-                controlsPanel
-                    .frame(maxWidth: .infinity)
+                sheetDetent = route.isEmpty ? .height(sheetCollapsedHeight) : .medium
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.top, 6)
     }
 
-    private var miniGSOLabel: some View {
-        Text("GSO")
-            .font(.system(size: 16, weight: .heavy, design: .rounded))
-            .foregroundColor(GSOColors.primary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
-            )
-            .accessibilityLabel("Georg-Simon-Ohm")
-    }
-
-    // MARK: - Navigation Card (turn-by-turn)
+    // MARK: - Navigation Card (turn-by-turn, Apple Maps-style top banner)
 
     private var navigationCard: some View {
         Group {
             if currentStepIndex < route.count {
                 let step = route[currentStepIndex]
-                VStack(spacing: 8) {
-                    HStack(spacing: 12) {
+                VStack(spacing: 10) {
+                    HStack(spacing: 14) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(GSOColors.primary)
-                                .frame(width: 44, height: 44)
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(GSOColors.primary.gradient)
+                                .frame(width: 52, height: 52)
                             Image(systemName: step.icon)
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(.white)
                         }
 
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(step.instruction)
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .font(.title3.weight(.bold))
                                 .lineLimit(2)
                                 .accessibilityLabel(step.instruction)
 
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
                                 if !isDemoMode && currentStepIndex < route.count - 1 && distanceToNext > 0 {
-                                    Text("\(Int(distanceToNext))m \(L.s("nav.toNextPoint"))")
-                                        .font(.system(size: 11)).foregroundColor(.secondary)
+                                    Text("\(Int(distanceToNext)) m")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
                                 }
                                 if isDemoMode {
-                                    HStack(spacing: 3) {
-                                        Circle().fill(.orange).frame(width: 5, height: 5)
-                                        Text(L.s("nav.demoActive"))
-                                            .font(.system(size: 10, weight: .medium))
-                                            .foregroundColor(.orange)
-                                    }
+                                    Label(L.s("nav.demoActive"), systemImage: "circle.fill")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.orange)
+                                        .imageScale(.small)
                                 }
                                 if step.floor > 0 {
                                     Text("OG")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .padding(.horizontal, 5).padding(.vertical, 2)
-                                        .background(Color.purple.opacity(0.2))
-                                        .cornerRadius(4)
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(.purple)
+                                        .padding(.horizontal, 6).padding(.vertical, 2)
+                                        .background(Color.purple.opacity(0.18), in: Capsule())
                                 }
                             }
                         }
                         Spacer()
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 10)
 
                     HStack(spacing: 3) {
                         ForEach(0..<route.count, id: \.self) { i in
                             Capsule()
                                 .fill(i <= currentStepIndex ? GSOColors.primary : Color.gray.opacity(0.2))
-                                .frame(height: 2.5)
+                                .frame(height: 3)
                         }
                     }
-                    .padding(.horizontal, 14)
 
                     HStack {
                         Text("\(L.s("nav.step")) \(currentStepIndex + 1)/\(route.count)")
-                            .font(.system(size: 11)).foregroundColor(.secondary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         Spacer()
-                        Button { stopAll() } label: {
+                        Button(role: .destructive) { stopAll() } label: {
                             Text(L.s("nav.endNav"))
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.red)
+                                .font(.subheadline.weight(.semibold))
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 8)
                 }
-                .background(.ultraThinMaterial)
-                .cornerRadius(14)
+                .padding(14)
+                .gsoFloatingCard(radius: GSOMetrics.sheetRadius)
                 .accessibilityElement(children: accessibilityMode ? .combine : .contain)
             }
         }
+    }
+
+    // MARK: - Floating controls (floor picker + locate-me, Apple Maps-style)
+
+    private var floorToggle: some View {
+        VStack(spacing: 0) {
+            floorButton(label: L.s("nav.floor.og"), isSelected: selectedFloor == 1, tint: .purple) { selectedFloor = 1 }
+            Divider().frame(width: 30)
+            floorButton(label: L.s("nav.floor.eg"), isSelected: selectedFloor == 0, tint: GSOColors.primary) { selectedFloor = 0 }
+        }
+        .gsoFloatingCard(radius: GSOMetrics.controlRadius)
+    }
+
+    private func floorButton(label: String, isSelected: Bool, tint: Color, action: @escaping () -> Void) -> some View {
+        Button {
+            lightHaptics.impactOccurred()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { action() }
+        } label: {
+            Text(label)
+                .font(.caption.weight(isSelected ? .bold : .medium))
+                .foregroundStyle(isSelected ? .white : .primary)
+                .frame(width: 44, height: 36)
+                .background(isSelected ? tint : Color.clear)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var locateMeButton: some View {
+        Button { locateUser() } label: {
+            ZStack {
+                if locating {
+                    ProgressView().progressViewStyle(.circular).tint(GSOColors.primary).scaleEffect(0.7)
+                } else {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(GSOColors.primary)
+                }
+            }
+            .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .gsoFloatingButton()
+        .disabled(locating)
     }
 
     // MARK: - Map
@@ -1613,7 +1628,7 @@ struct IndoorNavView: View {
                 let coords = buildPolylineCoords(from: startIdx)
                 if coords.count >= 2 {
                     MapPolyline(coordinates: coords)
-                        .stroke(GSOColors.primary, style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [8, 5]))
+                        .stroke(GSOColors.primary, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
                 }
             }
 
@@ -1659,7 +1674,7 @@ struct IndoorNavView: View {
                 }
             }
         }
-        .mapStyle(.hybrid(elevation: .realistic))
+        .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
         .accessibilityHidden(accessibilityMode)
     }
 
@@ -1683,89 +1698,80 @@ struct IndoorNavView: View {
         return coords
     }
 
-    // MARK: - Floor Toggle
-    private var floorToggle: some View {
-        HStack(spacing: 0) {
-            Button {
-                lightHaptics.impactOccurred()
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { selectedFloor = 0 }
-            } label: {
-                Text(L.s("nav.floor.eg"))
-                    .font(.system(size: 12, weight: selectedFloor == 0 ? .bold : .medium))
-                    .foregroundColor(selectedFloor == 0 ? .white : .primary)
-                    .padding(.horizontal, 14).padding(.vertical, 6)
-                    .background(selectedFloor == 0 ? GSOColors.primary : Color.clear)
-            }
-            Button {
-                lightHaptics.impactOccurred()
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { selectedFloor = 1 }
-            } label: {
-                Text(L.s("nav.floor.og"))
-                    .font(.system(size: 12, weight: selectedFloor == 1 ? .bold : .medium))
-                    .foregroundColor(selectedFloor == 1 ? .white : .primary)
-                    .padding(.horizontal, 14).padding(.vertical, 6)
-                    .background(selectedFloor == 1 ? Color.purple : Color.clear)
+    // MARK: - Bottom Sheet (Apple Maps-style)
+
+    @ViewBuilder
+    private var routeSheetContent: some View {
+        if isActivelyNavigating {
+            navActiveBar
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+        } else {
+            ScrollView {
+                VStack(spacing: 14) {
+                    searchFields
+                    if !route.isEmpty {
+                        routeSummaryCard
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 24)
             }
         }
-        .background(.ultraThinMaterial)
-        .cornerRadius(8)
     }
 
-    // MARK: - Controls (compact)
-    private var controlsPanel: some View {
-        VStack(spacing: 5) {
-            HStack(spacing: 5) {
-                Button { showStartPicker = true } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "location.circle.fill").foregroundColor(.green).font(.system(size: 14))
-                        Text(startNode?.displayName ?? L.s("nav.whereAreYou"))
-                            .font(.system(size: 12))
-                            .foregroundColor(startNode == nil ? .secondary : .primary)
-                            .lineLimit(1)
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 8)).foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal, 9).padding(.vertical, 6)
-                    .background(Color(.secondarySystemBackground).opacity(0.8))
-                    .cornerRadius(7)
+    private var navActiveBar: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(endNode?.displayName ?? "")
+                    .font(.headline)
+                    .lineLimit(1)
+                if !isDemoMode && distanceToNext > 0 {
+                    Text("\(Int(distanceToNext)) m \(L.s("nav.toNextPoint"))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
+            }
+            Spacer()
+            Button(role: .destructive) { stopAll() } label: {
+                Text(L.s("nav.endNav"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(Color.red, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var searchFields: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                searchField(icon: "location.circle.fill", iconColor: .green,
+                            text: startNode?.displayName ?? L.s("nav.whereAreYou"),
+                            isPlaceholder: startNode == nil) { showStartPicker = true }
 
                 Button { locateUser() } label: {
                     ZStack {
                         if locating {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .tint(.white)
-                                .scaleEffect(0.6)
+                            ProgressView().progressViewStyle(.circular).tint(.white).scaleEffect(0.6)
                         } else {
-                            Image(systemName: "location.fill")
-                                .font(.system(size: 11)).foregroundColor(.white)
+                            Image(systemName: "location.fill").font(.system(size: 13, weight: .semibold))
                         }
                     }
-                    .frame(width: 26, height: 26)
-                    .background(Color.green).cornerRadius(7)
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Color.green, in: RoundedRectangle(cornerRadius: GSOMetrics.pillRadius, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .disabled(locating)
             }
 
-            HStack(spacing: 5) {
-                Button { showEndPicker = true } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "flag.circle.fill").foregroundColor(.red).font(.system(size: 14))
-                        Text(endNode?.displayName ?? L.s("nav.whereToGo"))
-                            .font(.system(size: 12))
-                            .foregroundColor(endNode == nil ? .secondary : .primary)
-                            .lineLimit(1)
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 8)).foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal, 9).padding(.vertical, 6)
-                    .background(Color(.secondarySystemBackground).opacity(0.8))
-                    .cornerRadius(7)
-                }
-                .buttonStyle(.plain)
+            HStack(spacing: 8) {
+                searchField(icon: "flag.circle.fill", iconColor: .red,
+                            text: endNode?.displayName ?? L.s("nav.whereToGo"),
+                            isPlaceholder: endNode == nil) { showEndPicker = true }
 
                 Button {
                     lightHaptics.impactOccurred()
@@ -1774,90 +1780,97 @@ struct IndoorNavView: View {
                     }
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 11)).foregroundColor(.white)
-                        .frame(width: 26, height: 26)
-                        .background(GSOColors.primary).cornerRadius(7)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                        .background(GSOColors.primary, in: RoundedRectangle(cornerRadius: GSOMetrics.pillRadius, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }
 
-            if startNode != nil && endNode != nil {
+            if startNode != nil && endNode != nil && route.isEmpty {
                 Button {
                     haptics.impactOccurred()
                     if let s = startNode, let e = endNode {
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                             route = SchoolGraph.findRoute(from: s.id, to: e.id)
+                            sheetDetent = .medium
                         }
                         directionsExpanded = false
                     }
                 } label: {
                     Label(L.s("nav.calculate"), systemImage: "point.topleft.down.to.point.bottomright.curvepath.fill")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundColor(.white)
-                        .frame(maxWidth: .infinity).padding(.vertical, 7)
-                        .background(GSOColors.primary).cornerRadius(8)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(GSOColors.primary, in: RoundedRectangle(cornerRadius: GSOMetrics.controlRadius, style: .continuous))
                 }
                 .buttonStyle(PressableButtonStyle())
             }
         }
-        .padding(8)
-        .background(.ultraThinMaterial)
-        .cornerRadius(12)
     }
 
-    // MARK: - Route Overview Card (Apple-Style)
-    private var directionsPanel: some View {
+    private func searchField(icon: String, iconColor: Color, text: String, isPlaceholder: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon).foregroundStyle(iconColor).font(.system(size: 16))
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundStyle(isPlaceholder ? .secondary : .primary)
+                    .lineLimit(1)
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: GSOMetrics.controlRadius, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Route Summary Card (Apple Maps-style)
+
+    private var routeSummaryCard: some View {
         let stepsCount = max(0, route.count - 2)
         let totalDistance = estimatedDistance()
         let totalMinutes = max(1, Int(totalDistance / 60))
 
         return VStack(spacing: 0) {
-            // Header: ETA + Distance summary (compact)
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text("\(totalMinutes)")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundColor(.primary)
-                        Text(L.s("nav.approxMin"))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
+                        Text("\(totalMinutes)").font(.title2.weight(.bold))
+                        Text(L.s("nav.approxMin")).font(.subheadline).foregroundStyle(.secondary)
                     }
-                    Text("\(Int(totalDistance))m · \(stepsCount) \(L.s("nav.steps"))")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.secondary)
+                    Text("\(Int(totalDistance)) m · \(stepsCount) \(L.s("nav.steps"))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 6)
 
-                // Compact endpoints
-                VStack(alignment: .leading, spacing: 3) {
-                    routeEndpoint(color: .green, icon: "location.fill",
-                                  label: startNode?.displayName ?? "")
-                    routeEndpoint(color: .red, icon: "flag.fill",
-                                  label: endNode?.displayName ?? "")
+                VStack(alignment: .leading, spacing: 4) {
+                    routeEndpoint(color: .green, icon: "location.fill", label: startNode?.displayName ?? "")
+                    routeEndpoint(color: .red, icon: "flag.fill", label: endNode?.displayName ?? "")
                 }
-                .frame(maxWidth: 170, alignment: .leading)
 
                 Button {
                     lightHaptics.impactOccurred()
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         route = []
+                        sheetDetent = .height(sheetCollapsedHeight)
                     }
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.secondary)
-                        .frame(width: 24, height: 24)
-                        .background(Color(.tertiarySystemFill))
-                        .clipShape(Circle())
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26, height: 26)
+                        .background(Color(.tertiarySystemFill), in: Circle())
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
 
-            // Expandable steps list (more compact toggle)
             Button {
                 lightHaptics.impactOccurred()
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -1866,112 +1879,84 @@ struct IndoorNavView: View {
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: directionsExpanded ? "chevron.up" : "list.bullet")
-                        .font(.system(size: 10, weight: .semibold))
                     Text(directionsExpanded ? L.s("nav.hideSteps") : L.s("nav.showSteps"))
-                        .font(.system(size: 11, weight: .medium))
                     Spacer()
                 }
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .padding(.top, 10)
             }
             .buttonStyle(.plain)
 
             if directionsExpanded {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(route.enumerated()), id: \.element.id) { idx, step in
-                            HStack(alignment: .top, spacing: 8) {
-                                VStack(spacing: 0) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(idx == 0 ? Color.green :
-                                                  idx == route.count - 1 ? Color.green : GSOColors.primary)
-                                            .frame(width: 18, height: 18)
-                                        Image(systemName: step.icon)
-                                            .font(.system(size: 8))
-                                            .foregroundColor(.white)
-                                    }
-                                    if idx < route.count - 1 {
-                                        Rectangle()
-                                            .fill(GSOColors.primary.opacity(0.2))
-                                            .frame(width: 2, height: 12)
-                                    }
-                                }
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(step.instruction)
-                                        .font(.system(size: 11))
-                                        .padding(.top, 1)
-                                    if step.floor > 0 {
-                                        Text("OG")
-                                            .font(.system(size: 8, weight: .bold))
-                                            .foregroundColor(.purple).opacity(0.7)
-                                    }
-                                }
-                                Spacer()
-                            }
-                            .padding(.horizontal, 12)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel(step.instruction)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .frame(maxHeight: 130)
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .move(edge: .top)),
-                    removal: .opacity
-                ))
+                stepsList
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .move(edge: .top)),
+                        removal: .opacity
+                    ))
             }
 
-            // Action row: primary Start (compact), Demo as inline link
             HStack(spacing: 8) {
                 Button { startNavigation() } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "location.north.fill")
-                            .font(.system(size: 12, weight: .bold))
-                        Text(L.s("nav.startNav"))
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 9)
-                    .background(
-                        LinearGradient(colors: [GSOColors.primary, GSOColors.primary.opacity(0.85)],
-                                       startPoint: .top, endPoint: .bottom)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .shadow(color: GSOColors.primary.opacity(0.3), radius: 5, x: 0, y: 2)
+                    Label(L.s("nav.startNav"), systemImage: "location.north.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background(GSOColors.primary.gradient, in: RoundedRectangle(cornerRadius: GSOMetrics.controlRadius, style: .continuous))
                 }
                 .buttonStyle(PressableButtonStyle())
 
                 Button { startDemo() } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 9, weight: .semibold))
-                        Text(L.s("nav.startDemo"))
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    .foregroundColor(.orange)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 9)
-                    .background(Color.orange.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    Label(L.s("nav.startDemo"), systemImage: "play.fill")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 11)
+                        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: GSOMetrics.controlRadius, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 6)
-            .padding(.bottom, 10)
+            .padding(.top, 12)
         }
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 3)
-        .padding(.horizontal, 10)
+    }
+
+    private var stepsList: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(route.enumerated()), id: \.element.id) { idx, step in
+                    HStack(alignment: .top, spacing: 8) {
+                        VStack(spacing: 0) {
+                            ZStack {
+                                Circle()
+                                    .fill(idx == 0 || idx == route.count - 1 ? Color.green : GSOColors.primary)
+                                    .frame(width: 18, height: 18)
+                                Image(systemName: step.icon)
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(.white)
+                            }
+                            if idx < route.count - 1 {
+                                Rectangle()
+                                    .fill(GSOColors.primary.opacity(0.2))
+                                    .frame(width: 2, height: 12)
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(step.instruction).font(.caption)
+                            if step.floor > 0 {
+                                Text("OG").font(.caption2.weight(.bold)).foregroundStyle(.purple.opacity(0.7))
+                            }
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 2)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(step.instruction)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .frame(maxHeight: 160)
     }
 
     private func routeEndpoint(color: Color, icon: String, label: String) -> some View {
@@ -1980,17 +1965,13 @@ struct IndoorNavView: View {
                 Circle().fill(color).frame(width: 14, height: 14)
                 Image(systemName: icon)
                     .font(.system(size: 6, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(.white)
             }
             Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.primary)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.primary)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(Color(.tertiarySystemFill))
-        .clipShape(Capsule())
     }
 
     private func estimatedDistance() -> Double {
@@ -2156,19 +2137,20 @@ struct IndoorNavView: View {
                 Circle()
                     .fill(colorForCategory(node.category))
                     .frame(width: node.floor > 0 ? 8 : 10, height: node.floor > 0 ? 8 : 10)
+                    .overlay(Circle().stroke(.white, lineWidth: 1))
                     .overlay(
                         node.floor > 0
                         ? Circle().stroke(Color.purple, lineWidth: 1.5)
                         : nil
                     )
                 Text(node.displayName)
-                    .font(.system(size: node.displayName.contains("/") ? 5.5 : 7, weight: .medium))
-                    .foregroundColor(.white)
+                    .font(.system(size: node.displayName.contains("/") ? 5.5 : 7, weight: .semibold))
+                    .foregroundStyle(.primary)
                     .lineLimit(2)
                     .minimumScaleFactor(0.65)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 3).padding(.vertical, 1)
-                    .background(Color.black.opacity(node.floor > 0 ? 0.7 : 0.5)).cornerRadius(3)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
             }
         }
     }
@@ -2251,17 +2233,20 @@ struct NodePickerView: View {
                                 }
                             }
                         } label: {
-                            HStack {
-                                Image(systemName: "location.fill").foregroundColor(.green).frame(width: 28)
-                                VStack(alignment: .leading) {
-                                    Text(L.s("nav.currentLocation")).font(.headline)
-                                    Text(L.s("nav.gpsHint")).font(.caption).foregroundColor(.secondary)
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    Circle().fill(Color.green.opacity(0.15)).frame(width: 32, height: 32)
+                                    Image(systemName: "location.fill").foregroundStyle(.green).font(.system(size: 14, weight: .medium))
+                                }
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(L.s("nav.currentLocation")).font(.subheadline.weight(.semibold))
+                                    Text(L.s("nav.gpsHint")).font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                                 if locating { ProgressView() }
                             }
                         }
-                        .foregroundColor(.primary)
+                        .foregroundStyle(.primary)
                     }
                 }
 
@@ -2271,29 +2256,31 @@ struct NodePickerView: View {
                             Button {
                                 selectedNode = node; dismiss()
                             } label: {
-                                HStack {
-                                    Image(systemName: iconFor(node.category))
-                                        .foregroundColor(accentColor).frame(width: 28)
-                                    VStack(alignment: .leading) {
-                                        Text(node.id).font(.headline)
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        Circle().fill(accentColor.opacity(0.15)).frame(width: 32, height: 32)
+                                        Image(systemName: iconFor(node.category))
+                                            .foregroundStyle(accentColor).font(.system(size: 14, weight: .medium))
+                                    }
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(node.id).font(.subheadline.weight(.semibold))
                                         if node.displayName != node.id {
-                                            Text(node.displayName).font(.caption).foregroundColor(.secondary)
+                                            Text(node.displayName).font(.caption).foregroundStyle(.secondary)
                                         }
                                     }
                                     Spacer()
                                     if node.floor > 0 {
-                                        Text("OG").font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.purple)
+                                        Text("OG").font(.caption2.weight(.bold))
+                                            .foregroundStyle(.purple)
                                             .padding(.horizontal, 5).padding(.vertical, 2)
-                                            .background(Color.purple.opacity(0.1))
-                                            .cornerRadius(4)
+                                            .background(Color.purple.opacity(0.1), in: Capsule())
                                     }
                                     if selectedNode?.id == node.id {
-                                        Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                                     }
                                 }
                             }
-                            .foregroundColor(.primary)
+                            .foregroundStyle(.primary)
                         }
                     }
                 }
@@ -2360,10 +2347,10 @@ struct FloorPickerSheet: View {
                     .foregroundColor(GSOColors.primary)
                     .padding(.top, 6)
                 Text(L.s("nav.floorQuestionTitle"))
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(.title3.weight(.bold))
                     .multilineTextAlignment(.center)
                 Text(L.s("nav.floorQuestionMsg"))
-                    .font(.system(size: 13))
+                    .font(.footnote)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
@@ -2411,11 +2398,11 @@ struct FloorPickerSheet: View {
                     .shadow(color: color.opacity(0.35), radius: 6, x: 0, y: 3)
 
                 Text(label)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundColor(.primary)
 
                 Text(floor == 0 ? L.s("nav.floor.eg") : L.s("nav.floor.og"))
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.caption.weight(.bold))
                     .foregroundColor(color)
                     .padding(.horizontal, 8).padding(.vertical, 2)
                     .background(color.opacity(0.12))
