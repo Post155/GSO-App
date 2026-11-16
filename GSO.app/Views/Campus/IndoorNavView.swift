@@ -61,7 +61,7 @@ enum SchoolGraph {
     // Developer diagnostics. Keep false for production; set true while fixing routes.
     // It validates only outdoor/helper edges against building outlines and all edges
     // against forbidden zones, then prints exact problem edges in the Xcode console.
-    static let routeDebugLoggingEnabled = true
+    static let routeDebugLoggingEnabled = false
     static let showDebugNodesOnMap = false
 
     static let campusCenter = GeoCoord(lat: 50.927609, lon: 6.995676)
@@ -440,28 +440,6 @@ enum SchoolGraph {
                 coordinate: GeoCoord(lat: 50.927753499384124, lon: 6.995743375749953), category: .hallway, isNavigable: false),
 
 
-        // ── Explicit walkable path nodes from Parkplatz-Eingang to C/Aula ──
-        // These nodes are derived from the grey walkable parking/path overlays and
-        // the red route Batu marked in the screenshot. They intentionally follow the
-        // outside road/path around the parking area instead of drawing a diagonal
-        // line from Parkplatz/Eingang through the C/Aula walls.
-        NavNode(id: "EXT-AULA-1", displayNameKey: "node.outdoorMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927225, lon: 6.997455), category: .hallway, isNavigable: false),
-        NavNode(id: "EXT-AULA-2", displayNameKey: "node.outdoorMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927455, lon: 6.997355), category: .hallway, isNavigable: false),
-        NavNode(id: "EXT-AULA-3", displayNameKey: "node.outdoorMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927665, lon: 6.997155), category: .hallway, isNavigable: false),
-        NavNode(id: "EXT-AULA-4", displayNameKey: "node.outdoorMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927835, lon: 6.996900), category: .hallway, isNavigable: false),
-        NavNode(id: "EXT-AULA-5", displayNameKey: "node.outdoorMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927780, lon: 6.996720), category: .hallway, isNavigable: false),
-        NavNode(id: "EXT-AULA-6", displayNameKey: "node.outdoorMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927705, lon: 6.996570), category: .hallway, isNavigable: false),
-        NavNode(id: "EXT-AULA-7", displayNameKey: "node.outdoorMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927625, lon: 6.996410), category: .hallway, isNavigable: false),
-        NavNode(id: "EXT-AULA-8", displayNameKey: "node.outdoorMesh", block: "", floor: 0,
-                coordinate: GeoCoord(lat: 50.927585, lon: 6.996275), category: .hallway, isNavigable: false),
-
         // ── Door entry nodes (specific access doors at building edges) ──
         // Sporthalle direct: PRIMARY entrance for sports activities (faster than WC-SB-B-Sport)
         NavNode(id: "Door-Sporthalle", displayNameKey: "node.doorSporthalle", block: "Sport", floor: 0,
@@ -703,50 +681,6 @@ enum SchoolGraph {
                     GeoCoord(lat: 50.927108, lon: 6.997100),
                     GeoCoord(lat: 50.927202, lon: 6.996812),
                 ]),
-
-        // ── Preferred walkable corridor: Parkplatz-Eingang → C/Aula portal
-        // This follows the RED path Batu marked in the 12:39 screenshot: stay on the
-        // parking-side road, go around the north/east side, then approach the real
-        // WC-SB-C-Aula door. It deliberately does NOT use the Parkplatz center node,
-        // because that center-to-door segment cut through walls / parked-car areas.
-        NavEdge(from: "Eingang", to: "EXT-AULA-1", weight: 999 /* disabled: cuts through Aula/D002 walls */ + 5,
-                instruction: "nav.toParking", reverseInstruction: "nav.toEntrance",
-                icon: "figure.walk", reverseIcon: "door.left.hand.open", waypoints: []),
-        NavEdge(from: "EXT-AULA-1", to: "EXT-AULA-2", weight: 999 /* disabled: cuts through Aula/D002 walls */ + 8,
-                instruction: "nav.toParking", reverseInstruction: "nav.toEntrance",
-                icon: "figure.walk", reverseIcon: "figure.walk", waypoints: []),
-        NavEdge(from: "EXT-AULA-2", to: "EXT-AULA-3", weight: 999 /* disabled: cuts through Aula/D002 walls */ + 8,
-                instruction: "nav.toParking", reverseInstruction: "nav.toEntrance",
-                icon: "figure.walk", reverseIcon: "figure.walk", waypoints: []),
-        NavEdge(from: "EXT-AULA-3", to: "EXT-AULA-4", weight: 999 /* disabled: cuts through Aula/D002 walls */ + 8,
-                instruction: "nav.toParking", reverseInstruction: "nav.toEntrance",
-                icon: "figure.walk", reverseIcon: "figure.walk", waypoints: []),
-        NavEdge(from: "EXT-AULA-4", to: "EXT-AULA-5", weight: 999 /* disabled: cuts through Aula/D002 walls */ + 6,
-                instruction: "nav.toParking", reverseInstruction: "nav.toEntrance",
-                icon: "figure.walk", reverseIcon: "figure.walk", waypoints: []),
-        NavEdge(from: "EXT-AULA-5", to: "EXT-AULA-6", weight: 999 /* disabled: cuts through Aula/D002 walls */ + 5,
-                instruction: "nav.toParking", reverseInstruction: "nav.toEntrance",
-                icon: "figure.walk", reverseIcon: "figure.walk", waypoints: []),
-        NavEdge(from: "EXT-AULA-6", to: "EXT-AULA-7", weight: 999 /* disabled: cuts through Aula/D002 walls */ + 5,
-                instruction: "nav.toParking", reverseInstruction: "nav.toEntrance",
-                icon: "figure.walk", reverseIcon: "figure.walk", waypoints: []),
-        NavEdge(from: "EXT-AULA-7", to: "EXT-AULA-8", weight: 999 /* disabled: cuts through Aula/D002 walls */ + 4,
-                instruction: "nav.toParking", reverseInstruction: "nav.toEntrance",
-                icon: "figure.walk", reverseIcon: "figure.walk", waypoints: []),
-        NavEdge(from: "EXT-AULA-8", to: "Door-C-Aula", weight: 999 /* disabled: cuts through Aula/D002 walls */ + 3,
-                instruction: "nav.goToStairsCAula", reverseInstruction: "nav.toEntrance",
-                icon: "door.left.hand.open", reverseIcon: "figure.walk", waypoints: []),
-
-        // ── Parkplatz → C/Aula physical door
-        // Do NOT connect Parkplatz directly to WC-SB-C-Aula / SB-C-Aula / Aula:
-        // that draws a straight segment through the real exterior wall. The route
-        // now first walks to an explicit door point on the wall, then continues indoors.
-        // Parkplatz also joins the same explicit outside path. This prevents
-        // Parkplatz → Aula from cutting diagonally into the C/Aula wall.
-        NavEdge(from: "Parkplatz", to: "EXT-AULA-2", weight: 999 /* disabled: cuts through Aula/D002 walls */ + 20,
-                instruction: "nav.goToStairsCAula", reverseInstruction: "nav.toParking",
-                icon: "figure.walk", reverseIcon: "car.fill",
-                waypoints: [GeoCoord(lat: 50.927370, lon: 6.996950)]),
 
         // Inside connector after entering through the C/Aula door.
         NavEdge(from: "Door-C-Aula", to: "WC-SB-C-Aula", weight: 2,
@@ -1298,12 +1232,20 @@ enum SchoolGraph {
 // MARK: - Location Manager
 // ============================================================
 
+enum LocateOutcome {
+    case success(CLLocationCoordinate2D)
+    case permissionDenied
+    case timedOut
+}
+
 class NavLocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     @Published var lastLocation: CLLocationCoordinate2D?
     @Published var isTracking = false
+    @Published private(set) var authorizationStatus: CLAuthorizationStatus
 
     override init() {
+        authorizationStatus = manager.authorizationStatus
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest
@@ -1327,6 +1269,36 @@ class NavLocationManager: NSObject, ObservableObject, CLLocationManagerDelegate 
         lastLocation = locs.last?.coordinate
     }
     func locationManager(_ m: CLLocationManager, didFailWithError error: Error) {}
+
+    func locationManagerDidChangeAuthorization(_ m: CLLocationManager) {
+        authorizationStatus = m.authorizationStatus
+    }
+
+    /// Waits for a fresh GPS fix instead of guessing a fixed delay. Discards any
+    /// stale `lastLocation` from a previous session first, so an old fix can never
+    /// be mistaken for the current position when the new fix arrives late or not at all.
+    @MainActor
+    func locateOnce(timeout: TimeInterval = 8.0) async -> LocateOutcome {
+        if authorizationStatus == .denied || authorizationStatus == .restricted {
+            return .permissionDenied
+        }
+
+        lastLocation = nil
+        startTracking()
+        defer { stopTracking() }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if authorizationStatus == .denied || authorizationStatus == .restricted {
+                return .permissionDenied
+            }
+            if let loc = lastLocation {
+                return .success(loc)
+            }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        return .timedOut
+    }
 
     func closestNode(to coord: CLLocationCoordinate2D, floor: Int? = nil) -> NavNode? {
         let loc = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
@@ -1380,6 +1352,8 @@ struct IndoorNavView: View {
     @State private var demoTimer: Timer?
 
     @State private var showOffCampusAlert = false
+    @State private var showLocationErrorAlert = false
+    @State private var locationErrorMessage = ""
     @State private var directionsExpanded = false
     @State private var selectedFloor = 0
 
@@ -1446,6 +1420,11 @@ struct IndoorNavView: View {
             Button("OK") {}
         } message: {
             Text(L.s("nav.offCampusMsg"))
+        }
+        .alert(L.s("nav.locationErrorTitle"), isPresented: $showLocationErrorAlert) {
+            Button("OK") {}
+        } message: {
+            Text(locationErrorMessage)
         }
         .onChange(of: startNode) { route = []; stopAll() }
         .onChange(of: endNode) { route = []; stopAll() }
@@ -2033,10 +2012,11 @@ struct IndoorNavView: View {
     private func locateUser() {
         lightHaptics.impactOccurred()
         locating = true
-        locationManager.startTracking()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+        Task {
+            let outcome = await locationManager.locateOnce()
             locating = false
-            if let coord = locationManager.lastLocation {
+            switch outcome {
+            case .success(let coord):
                 if locationManager.isOnCampus(coord) {
                     pendingGPSCoord = coord
                     showFloorPicker = true
@@ -2044,11 +2024,15 @@ struct IndoorNavView: View {
                     successHaptics.notificationOccurred(.warning)
                     showOffCampusAlert = true
                 }
-            } else {
+            case .permissionDenied:
                 successHaptics.notificationOccurred(.warning)
-                showOffCampusAlert = true
+                locationErrorMessage = L.s("nav.locationDenied")
+                showLocationErrorAlert = true
+            case .timedOut:
+                successHaptics.notificationOccurred(.warning)
+                locationErrorMessage = L.s("nav.locationTimeout")
+                showLocationErrorAlert = true
             }
-            locationManager.stopTracking()
         }
     }
 
@@ -2211,6 +2195,10 @@ struct NodePickerView: View {
     @State private var search = ""
     @State private var locating = false
     @State private var showOffCampusAlert = false
+    @State private var showLocationErrorAlert = false
+    @State private var locationErrorMessage = ""
+    @State private var showFloorPicker = false
+    @State private var pendingGPSCoord: CLLocationCoordinate2D?
     @Environment(\.dismiss) private var dismiss
 
     private var filtered: [NavNode] {
@@ -2241,23 +2229,26 @@ struct NodePickerView: View {
                 if locationManager != nil {
                     Section {
                         Button {
+                            guard let locationManager else { return }
                             locating = true
-                            locationManager?.startTracking()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                                if let coord = locationManager?.lastLocation {
-                                    if locationManager?.isOnCampus(coord) == true {
-                                        if let closest = locationManager?.closestNode(to: coord) {
-                                            selectedNode = closest
-                                            dismiss()
-                                        }
+                            Task {
+                                let outcome = await locationManager.locateOnce()
+                                locating = false
+                                switch outcome {
+                                case .success(let coord):
+                                    if locationManager.isOnCampus(coord) {
+                                        pendingGPSCoord = coord
+                                        showFloorPicker = true
                                     } else {
                                         showOffCampusAlert = true
                                     }
-                                } else {
-                                    showOffCampusAlert = true
+                                case .permissionDenied:
+                                    locationErrorMessage = L.s("nav.locationDenied")
+                                    showLocationErrorAlert = true
+                                case .timedOut:
+                                    locationErrorMessage = L.s("nav.locationTimeout")
+                                    showLocationErrorAlert = true
                                 }
-                                locationManager?.stopTracking()
-                                locating = false
                             }
                         } label: {
                             HStack {
@@ -2319,6 +2310,23 @@ struct NodePickerView: View {
                 Button("OK") {}
             } message: {
                 Text(L.s("nav.offCampusMsg"))
+            }
+            .alert(L.s("nav.locationErrorTitle"), isPresented: $showLocationErrorAlert) {
+                Button("OK") {}
+            } message: {
+                Text(locationErrorMessage)
+            }
+            .sheet(isPresented: $showFloorPicker) {
+                FloorPickerSheet { chosenFloor in
+                    if let coord = pendingGPSCoord,
+                       let closest = locationManager?.closestNode(to: coord, floor: chosenFloor) {
+                        selectedNode = closest
+                        dismiss()
+                    }
+                    pendingGPSCoord = nil
+                }
+                .presentationDetents([.height(320), .medium])
+                .presentationDragIndicator(.visible)
             }
         }
     }

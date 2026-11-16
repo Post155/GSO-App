@@ -124,6 +124,11 @@ enum L {
         "nav.offCampusTitle": "Nicht auf dem Schulgelände",
         "nav.offCampusMsg": "Du befindest dich gerade nicht auf dem Schulgelände. Bitte wähle deinen Standort manuell aus.",
 
+        // Location errors
+        "nav.locationErrorTitle": "Standort nicht verfügbar",
+        "nav.locationDenied": "Standortzugriff ist nicht erlaubt. Bitte aktiviere ihn in den Einstellungen, um diese Funktion zu nutzen.",
+        "nav.locationTimeout": "Dein Standort konnte nicht ermittelt werden. Bitte versuche es erneut.",
+
         // Campus
         "gso.3d": "3D Campus",
         "gso.3dHint": "Drehen & Zoomen",
@@ -302,6 +307,10 @@ enum L {
 
         "nav.offCampusTitle": "Not on Campus",
         "nav.offCampusMsg": "You are currently not on the school campus. Please select your location manually.",
+
+        "nav.locationErrorTitle": "Location Unavailable",
+        "nav.locationDenied": "Location access is not allowed. Please enable it in Settings to use this feature.",
+        "nav.locationTimeout": "We couldn't determine your location. Please try again.",
 
         "gso.3d": "3D Campus",
         "gso.3dHint": "Rotate & Zoom",
