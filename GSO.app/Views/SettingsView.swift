@@ -1,5 +1,9 @@
 import SwiftUI
 
+#Preview {
+    SettingsView()
+}
+
 struct SettingsView: View {
     @AppStorage("appLanguage") private var currentLang: String = "de"
     @AppStorage("appAppearance") private var appearanceRaw: Int = 0
@@ -7,23 +11,20 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                GSOHeader()
+            GeometryReader { geo in
+                let isWide = geo.size.width > 700
 
-                GeometryReader { geo in
-                    let isWide = geo.size.width > 700
+                HStack(spacing: 0) {
+                    if isWide { Spacer(minLength: 0) }
 
-                    HStack(spacing: 0) {
-                        if isWide { Spacer(minLength: 0) }
+                    settingsList
+                        .frame(maxWidth: isWide ? 640 : .infinity)
 
-                        settingsList
-                            .frame(maxWidth: isWide ? 640 : .infinity)
-
-                        if isWide { Spacer(minLength: 0) }
-                    }
+                    if isWide { Spacer(minLength: 0) }
                 }
             }
-            .navigationBarHidden(true)
+            .navigationTitle(L.s("settings.title"))
+            .navigationBarTitleDisplayMode(.large)
         }
     }
 
@@ -39,14 +40,15 @@ struct SettingsView: View {
                         HStack {
                             Text(lang.flag)
                             Text(lang.displayName)
-                                .foregroundColor(.primary)
+                                .foregroundStyle(.primary)
                             Spacer()
                             if currentLang == lang.rawValue {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(GSOColors.primary)
+                                    .foregroundStyle(GSOColors.primary)
                             }
                         }
                     }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -64,7 +66,7 @@ struct SettingsView: View {
                 Toggle(isOn: $accessibilityMode) {
                     HStack {
                         Image(systemName: "accessibility")
-                            .foregroundColor(GSOColors.primary)
+                            .foregroundStyle(GSOColors.primary)
                         Text(L.s("settings.accessibilityToggle"))
                     }
                 }
@@ -77,16 +79,19 @@ struct SettingsView: View {
                     VStack(spacing: 6) {
                         Image(systemName: "building.columns.fill")
                             .font(.title3)
-                            .foregroundColor(.secondary.opacity(0.3))
+                            .foregroundStyle(.tertiary)
                         Text("Georg-Simon-Ohm Berufskolleg Köln")
-                            .font(.caption).foregroundColor(.secondary.opacity(0.5))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         Text(L.s("settings.info"))
-                            .font(.caption2).foregroundColor(.secondary.opacity(0.4))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                     }
                     Spacer()
                 }
                 .listRowBackground(Color.clear)
             }
         }
+        .listStyle(.insetGrouped)
     }
 }

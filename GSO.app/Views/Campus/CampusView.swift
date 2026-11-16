@@ -1,27 +1,26 @@
 import SwiftUI
 import SceneKit
 
-struct CampusView: View {
-    @Environment(\.horizontalSizeClass) private var hSizeClass
+#Preview {
+    CampusView()
+}
 
+struct CampusView: View {
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                GSOHeader()
+            GeometryReader { geo in
+                let isWide = geo.size.width > geo.size.height && geo.size.width > 700
 
-                GeometryReader { geo in
-                    let isWide = geo.size.width > geo.size.height && geo.size.width > 700
-
+                Group {
                     if isWide {
-                        // iPad / Landscape: Side-by-Side
                         wideLayout
                     } else {
-                        // iPhone / Portrait: vertikales Scrollen
                         compactLayout
                     }
                 }
             }
-            .navigationBarHidden(true)
+            .navigationTitle(L.s("gso.campusTitle"))
+            .navigationBarTitleDisplayMode(.large)
         }
     }
 
@@ -29,37 +28,32 @@ struct CampusView: View {
     private var compactLayout: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                heroHeader
+                statsCard
                 model3DSection(height: 280)
                 panorama360Section
                 footer
             }
+            .padding(.top, 8)
         }
     }
 
     // MARK: - Wide (iPad Landscape)
     private var wideLayout: some View {
         VStack(alignment: .leading, spacing: 16) {
-            heroHeader
+            statsCard
+                .padding(.horizontal)
 
             HStack(alignment: .top, spacing: 16) {
-                // Left: 3D Modell (groß)
                 VStack(alignment: .leading, spacing: 10) {
                     sectionHeader(titleKey: "gso.3d", icon: "cube.fill",
                                   hintKey: "gso.3dHint", hintIcon: "hand.draw")
 
                     SceneViewWrapper(modelName: "school_model")
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(20)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-                        )
+                        .gsoFloatingCard()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .frame(maxWidth: .infinity)
 
-                // Right: 360° Panorama Liste
                 VStack(alignment: .leading, spacing: 10) {
                     sectionHeader(titleKey: "gso.360title", icon: "pano.fill",
                                   hintKey: "gso.360hint", hintIcon: "arrow.triangle.2.circlepath")
@@ -85,65 +79,46 @@ struct CampusView: View {
 
     // MARK: - Shared Pieces
 
-    private var heroHeader: some View {
-        VStack(spacing: 6) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L.s("gso.campusTitle"))
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                    Text(L.s("gso.campusSubtitle"))
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-                Image(systemName: "building.2.fill")
-                    .font(.system(size: 32))
-                    .foregroundColor(GSOColors.primary.opacity(0.2))
-            }
-            .padding(.horizontal)
-            .padding(.top, 16)
-
-            HStack(spacing: 0) {
-                StatPill(value: "2.560", label: L.s("gso.stats.students"), icon: "person.2.fill")
-                Divider().frame(height: 30)
-                StatPill(value: "80", label: L.s("gso.stats.teachers"), icon: "person.fill")
-                Divider().frame(height: 30)
-                StatPill(value: "1822", label: L.s("gso.stats.founded"), icon: "calendar")
-                Divider().frame(height: 30)
-                StatPill(value: "3", label: L.s("gso.stats.buildings"), icon: "building.fill")
-            }
-            .padding(.vertical, 12)
-            .background(Color(.secondarySystemBackground))
-            .cornerRadius(14)
-            .padding(.horizontal)
+    private var statsCard: some View {
+        HStack(spacing: 0) {
+            StatPill(value: "2.560", label: L.s("gso.stats.students"), icon: "person.2.fill")
+            Divider().frame(height: 30)
+            StatPill(value: "80", label: L.s("gso.stats.teachers"), icon: "person.fill")
+            Divider().frame(height: 30)
+            StatPill(value: "1822", label: L.s("gso.stats.founded"), icon: "calendar")
+            Divider().frame(height: 30)
+            StatPill(value: "3", label: L.s("gso.stats.buildings"), icon: "building.fill")
         }
+        .padding(.vertical, 12)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: GSOMetrics.cardRadius, style: .continuous))
+        .padding(.horizontal)
     }
 
     private func sectionHeader(titleKey: String, icon: String,
                                hintKey: String, hintIcon: String) -> some View {
         HStack {
             Label(L.s(titleKey), systemImage: icon)
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .font(.headline)
             Spacer()
             Label(L.s(hintKey), systemImage: hintIcon)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
         }
+        .padding(.horizontal)
     }
 
     private func model3DSection(height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(titleKey: "gso.3d", icon: "cube.fill",
                           hintKey: "gso.3dHint", hintIcon: "hand.draw")
-                .padding(.horizontal)
 
             SceneViewWrapper(modelName: "school_model")
                 .frame(height: height)
                 .background(Color(.secondarySystemBackground))
-                .cornerRadius(16)
+                .clipShape(RoundedRectangle(cornerRadius: GSOMetrics.cardRadius, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: GSOMetrics.cardRadius, style: .continuous)
+                        .stroke(GSOMetrics.hairlineColor, lineWidth: GSOMetrics.hairline)
                 )
                 .padding(.horizontal)
         }
@@ -153,13 +128,12 @@ struct CampusView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(titleKey: "gso.360title", icon: "pano.fill",
                           hintKey: "gso.360hint", hintIcon: "arrow.triangle.2.circlepath")
-                .padding(.horizontal)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    Panorama360Card(imageName: "MiddleAreaB", title: L.s("gso.blockB"), accentColor: GSOColors.primary)
-                    Panorama360Card(imageName: "MiddleAreaC", title: L.s("gso.blockC"), accentColor: GSOColors.primary)
-                    Panorama360Card(imageName: "UpperLevelA", title: L.s("gso.upperA"), accentColor: GSOColors.primary)
+                    Panorama360Card(imageName: "MiddleAreaB", title: L.s("gso.blockB"))
+                    Panorama360Card(imageName: "MiddleAreaC", title: L.s("gso.blockC"))
+                    Panorama360Card(imageName: "UpperLevelA", title: L.s("gso.upperA"))
                 }
                 .padding(.horizontal)
             }
@@ -172,9 +146,10 @@ struct CampusView: View {
             VStack(spacing: 4) {
                 Image(systemName: "building.columns.fill")
                     .font(.caption)
-                    .foregroundColor(.secondary.opacity(0.3))
+                    .foregroundStyle(.tertiary)
                 Text("Westerwaldstraße 92, Köln")
-                    .font(.system(size: 11)).foregroundColor(.secondary.opacity(0.4))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
             Spacer()
         }
@@ -192,13 +167,13 @@ struct StatPill: View {
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 13))
-                .foregroundColor(GSOColors.primary)
+                .font(.subheadline)
+                .foregroundStyle(GSOColors.primary)
             Text(value)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(.subheadline.weight(.bold))
             Text(label)
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -209,7 +184,6 @@ struct StatPill: View {
 struct Panorama360Card: View {
     let imageName: String
     let title: String
-    let accentColor: Color
 
     var body: some View {
         NavigationLink(destination: Room360View(imageName: imageName, roomName: title)) {
@@ -222,25 +196,25 @@ struct Panorama360Card: View {
 
                 HStack {
                     Image(systemName: "pano")
-                        .font(.system(size: 10))
-                        .foregroundColor(accentColor)
+                        .font(.caption2)
+                        .foregroundStyle(GSOColors.primary)
                     Text(title)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.primary)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
             }
             .frame(width: 200)
             .background(Color(.secondarySystemBackground))
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: GSOMetrics.controlRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+                RoundedRectangle(cornerRadius: GSOMetrics.controlRadius, style: .continuous)
+                    .stroke(GSOMetrics.hairlineColor, lineWidth: GSOMetrics.hairline)
             )
         }
     }
@@ -260,32 +234,32 @@ struct Panorama360RowCard: View {
                     .scaledToFill()
                     .frame(width: 92, height: 64)
                     .clipped()
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundColor(.primary)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
                     HStack(spacing: 4) {
                         Image(systemName: "pano.fill")
-                            .font(.system(size: 9))
-                            .foregroundColor(GSOColors.primary)
+                            .font(.caption2)
+                            .foregroundStyle(GSOColors.primary)
                         Text(L.s("gso.360title"))
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary.opacity(0.6))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .padding(10)
             .background(Color(.secondarySystemBackground))
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: GSOMetrics.controlRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+                RoundedRectangle(cornerRadius: GSOMetrics.controlRadius, style: .continuous)
+                    .stroke(GSOMetrics.hairlineColor, lineWidth: GSOMetrics.hairline)
             )
         }
     }

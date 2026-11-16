@@ -3,6 +3,10 @@ import MapKit
 import CoreLocation
 import Combine
 
+#Preview {
+    IndoorNavView()
+}
+
 // ============================================================
 // MARK: - Data Types
 // ============================================================
