@@ -1,0 +1,12 @@
+{
+  "name": "gso-campus-navigator",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Konfigurierbare GSO Campus- und Innennavigation",
+  "engines": {"node": ">=20"},
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "build": "node scripts/build.cjs",
+    "test": "node tests/engine.cjs && node tests/configuration.cjs && node tests/application.cjs && node tests/offline.cjs && node tests/source.cjs"
+  }
+}

@@ -1,0 +1,19 @@
+GSO Campus Navigator 2.0 – 17.11.2026
+Befehle: npm run build; npm test; python -m compileall -q tools/source-generation
+Browserprüfung: nicht verfügbar
+
+Routing: 6,000 oracle comparisons, alternatives and transition policies passed
+Configuration: catalogue, schema, unsafe attributes, prototype fields, duplicates and dangling references passed
+Boot and configuration passed
+Wall-checked door reachability { doors: 270, reachable: 270 }
+Local save / reload passed
+Floor route, overlays and step-free restrictions passed
+Search, favourites and history passed
+Wall crossing rejection passed
+Malformed import and attribute validation passed
+Original outdoor geometry preserved
+Reset passed
+Legacy migration and atomic room catalogue persistence passed
+Application regression checks passed
+Offline: install assets, scoped cache cleanup, QR query navigation and private URL exclusion passed
+Source: syntax, CSP, local assets, unique HTML IDs, no dynamic execution, no inactive entrypoints passed
