@@ -113,14 +113,14 @@ async function bootstrap(){
   
   try{
  
-    const [building,rooms,campus,navigation,outlines,landscape,walkability]=await Promise.all(['building','rooms','campus','indoor-navigation','outline-migration','landscape-migration','walkability'].map(name=>readJSON('config/'+name+'.json')));
+    const [building,rooms,campus,navigation,outlines,landscape,walkability,appConfig]=await Promise.all(['building','rooms','campus','indoor-navigation','outline-migration','landscape-migration','walkability','app'].map(name=>readJSON('config/'+name+'.json')));
     data=building;
+    appSettings=Config.validateApp(appConfig);
     configRooms=Config.validateRooms(rooms);
-    completedData=campus;
-    indoorNavigation=navigation;
-    outlineMigration=outlines;
-    landscapeMigration=landscape;
-    configureWalkability(walkability);
+    SCHOOL_VIEW=[...appSettings.maps.school];
+    NEIGHBOURHOOD_VIEW=[...appSettings.maps.neighbourhood];
+    base=[...SCHOOL_VIEW];
+    view=[...base];
     const customIDs=new Set(campus.customPlaces.map(p=>p.id));
     outside=['gate-north','smoking','bicycles','cars','gate-parking',...Array.from({length:8},(_,i)=>'entry-'+(i+1))].map(id=>({id,...campus.pointMeta[id],pos:campus.points[id],node:campus.pointNodes[id],floor:'Gelände',outdoor:true,hidden:campus.hiddenPoints.includes(id)}));
     places=[...outside,...configRooms.rooms.map(r=>({id:r.id,code:r.code,name:r.name,building:r.building,category:r.type,floor:r.floor,x:r.x,y:r.y,region:r.region,pos:world(r.x,r.y),node:campus.pointNodes[r.id]||null,outdoor:false,important:r.important,hidden:!r.visible}))];
@@ -157,7 +157,7 @@ async function bootstrap(){
     positionFromURL();
     renderList();
     renderDashboard();
-    $('#app-status').textContent='Karte bereit · Stand 17.11.2026';
+    $('#app-status').textContent=appSettings.release.statusReady+' · Stand '+appSettings.release.date;
     if('serviceWorker'in navigator){
       
       try{
@@ -184,10 +184,10 @@ async function bootstrap(){
   }catch(err){
     
     console.error(err);
-    $('#app-status').textContent='Laden fehlgeschlagen. Bitte erneut versuchen.';
+    $('#app-status').textContent=appSettings?.release.statusLoadFailed||'Laden fehlgeschlagen. Bitte erneut versuchen.';
     $('#places').innerHTML='<p class="empty">Die Karte konnte nicht geladen werden.</p>';
     $('#dashboard-results').hidden=false;
-    $('#dashboard-results').innerHTML='<p class="dashboard-empty">Karte nicht verfügbar. <button id="retry-load">Erneut laden</button></p>';
+    $('#dashboard-results').innerHTML='<p class="dashboard-empty">'+esc(appSettings?.release.statusRetryDashboard||'Karte nicht verfügbar.')+' <button id="retry-load">Erneut laden</button></p>';
     $('#retry-load').onclick=()=>location.reload()
   }
 }

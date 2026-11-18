@@ -57,3 +57,13 @@ Anschließend `npm test` und `npm run build` ausführen und `dist/` veröffentli
 ## Standort-Links und QR-Codes
 
 Raum öffnen → „Standort-Link“. Der Link enthält nur `?location=<Ziel-ID>`. Beim Öffnen wird der bekannte Ort als manuell bestätigter Startpunkt dargestellt. Der Link lässt sich mit einem beliebigen vertrauenswürdigen QR-Druckwerkzeug als Schild drucken und mit der normalen Smartphonekamera öffnen. Keine zusätzlichen Kamera- oder Bluetoothrechte sind nötig. Ein unbekannter Standort-Link erzeugt keine erfundene Position.
+
+## Zentrale App-Einstellungen
+
+`dist/config/app.json` enthält freistehende, nicht geometrische Darstellungseinstellungen:
+
+- `release`: sichtbarer Veröffentlichungsstand und Lade-/Fehlertexte;
+- `maps.school`: Standardansicht der Campuskarte;
+- `maps.neighbourhood`: Standardansicht der Umgebungskarte.
+
+Die Datei wird beim Start geprüft und ist Teil der Offline-Dateiliste. Ungültige Ansichten oder fehlende Statustexte verhindern den Start kontrolliert; bestehende Karten-, Raum- und Routingdaten bleiben davon getrennt.

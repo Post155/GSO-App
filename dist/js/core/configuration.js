@@ -163,7 +163,14 @@ const Config = (() => {
     }
     return safeClone(raw)
   }
-  return {validate,validateRooms,safeClone};
+  function validateApp(raw){
+    assert(raw?.schemaVersion===1&&raw.release&&raw.maps,'Ungültige App-Konfiguration.');
+    assert(text(raw.release.date)&&text(raw.release.statusReady)&&text(raw.release.statusLoadFailed)&&text(raw.release.statusRetryDashboard),'Ungültige App-Statustexte.');
+    const view=v=>Array.isArray(v)&&v.length===4&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<10000);
+    assert(view(raw.maps.school)&&view(raw.maps.neighbourhood),'Ungültige Kartenansichten.');
+    return safeClone(raw)
+  }
+  return {validate,validateRooms,validateApp,safeClone};
 })();
 if(typeof module!=='undefined'&&module.exports)
 {

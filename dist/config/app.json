@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "date": "17.11.2026",
+    "statusReady": "Karte bereit",
+    "statusLoadFailed": "Laden fehlgeschlagen. Bitte erneut versuchen.",
+    "statusRetryDashboard": "Karte nicht verfügbar."
+  },
+  "maps": {
+    "school": [-35, 125, 650, 680],
+    "neighbourhood": [-1750, -840, 4220, 2264]
+  }
+}

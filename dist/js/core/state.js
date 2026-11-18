@@ -3,8 +3,8 @@ const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const clone = value => JSON.parse(JSON.stringify(value));
-const SCHOOL_VIEW = [-35,125,650,680];
-const NEIGHBOURHOOD_VIEW = [-1750,-840,4220,2264];
+let SCHOOL_VIEW = [-35,125,650,680];
+let NEIGHBOURHOOD_VIEW = [-1750,-840,4220,2264];
 const sceneDefaults = {road:'#526b7c',footway:'#88958c',tree:'#4f765f'};
 const icons = {classroom:'▤',office:'▥',service:'◇',wc:'WC',stairs:'↗',lift:'↕',corridor:'↔',entrance:'↪',gate:'↪',parking:'P',bicycle:'♧',smoking:'≈',bus:'H',tip:'★',marker:'•'};
 let data, places=[], floor='EG', filter='all', selected=null, routePath=null, start=null, end=null;
@@ -67,3 +67,4 @@ function emptyPlacesHint(){
 }
 
 let backgroundCache=null;
+let appSettings=null;

@@ -139,3 +139,30 @@ Aktuelle technische Quellen zur Erweiterungsbewertung, abgerufen am 17.11.2026:
 5. DE/EN-Sprachkatalog vervollständigen und bei künftigem Ausbau den verbleibenden geteilten Frontendzustand in ES-Module überführen.
 
 Die Punkte 1–3 sind reale Abnahme-/Datenlücken. Sie wurden sichtbar dokumentiert und durch gesperrte unbekannte Verbindungen abgesichert, nicht als erledigt ausgegeben.
+
+## Nachtrag zur Wartbarkeitsrestrukturierung
+
+### Vorherige technische Schulden
+
+- Zentrale Kartenansichten und Statustexte waren direkt in Laufzeitcode eingebettet.
+- Änderungen an ansichtsbezogenen oder textlichen Standardeinstellungen erforderten eine Bearbeitung des JavaScript-Bootstraps.
+- Die zentrale Konfigurationsprüfung exportierte keinen separaten App-Konfigurationstyp.
+
+### Durchgeführte Wartbarkeitsoptimierung
+
+- Neue Datei `dist/config/app.json` für Veröffentlichungsstand, Lade-/Fehlertexte und Schul-/Umgebungsansicht.
+- Prüffunktion `Config.validateApp()` für Schema und begrenzte Zahlentypen.
+- Bootstrap lädt die App-Konfiguration gemeinsam mit den übrigen Konfigurationsdateien und setzt die laufenden Ansichten daraus.
+- Bestehende Raum-, Routing-, Editor-, Offline- und Kartenprozesse wurden nicht verändert.
+- Die Konfigurationsprüfung und Dokumentation wurden um die neue Datei erweitert.
+- Der Offline-Build erkennt JSON-Dateien unter `dist/config/` bereits durch das bestehende generierte Dateiverzeichnis und nimmt die neue Datei in den Cache auf.
+
+### Verhaltensgrenze
+
+Die Restrukturierung ist auf Konfigurationsauslagerung beschränkt. Die Ausgabe bleibt bei unveränderten JSON-Werten identisch. Eine vollständige lokale Regressionsausführung war nach Abbruch der Node.js-Installation mit dieser Umgebung nicht möglich; Editor-Diagnostik meldet für die geänderten JavaScript-Dateien keine Syntaxfehler.
+
+### Empfehlung für die nächste Wartungsphase
+
+- Weitere sichtbare freistehende Texte in sprachgebundene Konfigurationsbereiche verschieben.
+- Die großen Editor- und Kartenmodule bei späterem Funktionsausbau in kleinere Verantwortungsdateien teilen.
+- Der Build-/Test-Lauf soll nach erfolgreicher Installation von Node.js 20+ erneut ausgeführt werden.
